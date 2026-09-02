@@ -18,6 +18,10 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 105MB
 
 server:
   port: 8080
@@ -33,6 +37,11 @@ management:
         include: health,info,metrics
 
 memorylink:
+  storage:
+    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:memorylink}
+    secret-key: ${MINIO_SECRET_KEY:memorylink123}
+    bucket: ${MINIO_BUCKET:memorylink}
   deepseek:
     api-key: ${DEEPSEEK_API_KEY:}
     base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}

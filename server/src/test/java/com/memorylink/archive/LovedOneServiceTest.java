@@ -14,7 +14,7 @@ import com.memorylink.archive.dto.LovedOneResponse;
 import com.memorylink.archive.dto.MediaResponse;
 import com.memorylink.common.BusinessException;
 import com.memorylink.family.Family;
-import com.memorylink.family.FamilyRepository;
+import com.memorylink.family.FamilyService;
 import com.memorylink.storage.MediaStorage;
 import java.io.ByteArrayInputStream;
 import java.time.LocalDate;
@@ -34,7 +34,7 @@ class LovedOneServiceTest {
     @Mock
     private MediaFileRepository mediaFileRepository;
     @Mock
-    private FamilyRepository familyRepository;
+    private FamilyService familyService;
     @Mock
     private MediaStorage mediaStorage;
 
@@ -42,16 +42,14 @@ class LovedOneServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new LovedOneService(lovedOneRepository, mediaFileRepository, familyRepository, mediaStorage);
+        service = new LovedOneService(lovedOneRepository, mediaFileRepository, familyService, mediaStorage);
     }
 
     @Test
-    void createCreatesDefaultFamilyWhenMissing() {
-        when(familyRepository.findFirstByCreatorIdOrderByIdAsc(1L)).thenReturn(Optional.empty());
+    void createCreatesUnderDefaultFamily() {
         Family family = new Family();
         family.setId(10L);
-        family.setCreatorId(1L);
-        when(familyRepository.save(any(Family.class))).thenReturn(family);
+        when(familyService.getOrCreateDefaultFamily(1L, "13800138001")).thenReturn(family);
 
         LovedOne saved = new LovedOne();
         saved.setId(1L);
@@ -60,7 +58,7 @@ class LovedOneServiceTest {
         saved.setCreatedBy(1L);
         when(lovedOneRepository.save(any(LovedOne.class))).thenReturn(saved);
 
-        LovedOneResponse response = service.create(1L, "小明",
+        LovedOneResponse response = service.create(1L, "13800138001",
                 new LovedOneRequest("张爷爷", LocalDate.of(1940, 1, 1), LocalDate.of(2020, 5, 1), "上海", null));
 
         assertThat(response.id()).isEqualTo(1L);
@@ -69,11 +67,12 @@ class LovedOneServiceTest {
     }
 
     @Test
-    void getAccessDeniedForOtherUsersArchive() {
+    void getForbiddenForNonFamilyMember() {
         LovedOne lovedOne = new LovedOne();
         lovedOne.setId(1L);
-        lovedOne.setCreatedBy(2L);
+        lovedOne.setFamilyId(9L);
         when(lovedOneRepository.findById(1L)).thenReturn(Optional.of(lovedOne));
+        when(familyService.canAccess(1L, 9L)).thenReturn(false);
 
         assertThatThrownBy(() -> service.get(1L, 1L))
                 .isInstanceOf(BusinessException.class)
@@ -84,8 +83,9 @@ class LovedOneServiceTest {
     void uploadMediaStoresObjectAndSavesRecord() throws Exception {
         LovedOne lovedOne = new LovedOne();
         lovedOne.setId(1L);
-        lovedOne.setCreatedBy(1L);
+        lovedOne.setFamilyId(9L);
         when(lovedOneRepository.findById(1L)).thenReturn(Optional.of(lovedOne));
+        when(familyService.canAccess(1L, 9L)).thenReturn(true);
 
         MultipartFile file = mock(MultipartFile.class);
         when(file.isEmpty()).thenReturn(false);

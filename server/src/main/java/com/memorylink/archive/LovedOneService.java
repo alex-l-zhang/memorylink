@@ -5,8 +5,10 @@ import com.memorylink.archive.dto.LovedOneResponse;
 import com.memorylink.archive.dto.MediaResponse;
 import com.memorylink.common.BusinessException;
 import com.memorylink.family.Family;
-import com.memorylink.family.FamilyRepository;
+import com.memorylink.family.FamilyMember;
+import com.memorylink.family.FamilyService;
 import com.memorylink.storage.MediaStorage;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -25,23 +27,22 @@ public class LovedOneService {
 
     private final LovedOneRepository lovedOneRepository;
     private final MediaFileRepository mediaFileRepository;
-    private final FamilyRepository familyRepository;
+    private final FamilyService familyService;
     private final MediaStorage mediaStorage;
 
     public LovedOneService(LovedOneRepository lovedOneRepository,
                            MediaFileRepository mediaFileRepository,
-                           FamilyRepository familyRepository,
+                           FamilyService familyService,
                            MediaStorage mediaStorage) {
         this.lovedOneRepository = lovedOneRepository;
         this.mediaFileRepository = mediaFileRepository;
-        this.familyRepository = familyRepository;
+        this.familyService = familyService;
         this.mediaStorage = mediaStorage;
     }
 
     @Transactional
     public LovedOneResponse create(Long userId, String userName, LovedOneRequest request) {
-        Family family = familyRepository.findFirstByCreatorIdOrderByIdAsc(userId)
-                .orElseGet(() -> createDefaultFamily(userId, userName));
+        Family family = familyService.getOrCreateDefaultFamily(userId, userName);
 
         LovedOne lovedOne = new LovedOne();
         lovedOne.setFamilyId(family.getId());
@@ -58,22 +59,25 @@ public class LovedOneService {
 
     @Transactional(readOnly = true)
     public List<LovedOneResponse> list(Long userId) {
-        Family family = familyRepository.findFirstByCreatorIdOrderByIdAsc(userId).orElse(null);
-        if (family == null) {
+        List<Long> familyIds = familyService.membershipsOf(userId).stream()
+                .filter(m -> "ACTIVE".equals(m.getStatus()))
+                .map(FamilyMember::getFamilyId)
+                .toList();
+        if (familyIds.isEmpty()) {
             return List.of();
         }
-        return lovedOneRepository.findByFamilyIdOrderByCreatedAtDesc(family.getId())
+        return lovedOneRepository.findByFamilyIdInOrderByCreatedAtDesc(familyIds)
                 .stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
     public LovedOneResponse get(Long userId, Long id) {
-        return toResponse(requireOwned(userId, id));
+        return toResponse(requireAccess(userId, id));
     }
 
     @Transactional
     public MediaResponse uploadMedia(Long userId, Long lovedOneId, String mediaType, MultipartFile file) {
-        LovedOne lovedOne = requireOwned(userId, lovedOneId);
+        LovedOne lovedOne = requireAccess(userId, lovedOneId);
         String type = mediaType == null ? "" : mediaType.trim().toUpperCase();
         if (!MEDIA_TYPES.contains(type)) {
             throw new BusinessException(CODE_INVALID_MEDIA_TYPE, "mediaType 仅支持 PHOTO/AUDIO/VIDEO");
@@ -104,31 +108,23 @@ public class LovedOneService {
 
     @Transactional(readOnly = true)
     public List<MediaResponse> listMedia(Long userId, Long lovedOneId) {
-        requireOwned(userId, lovedOneId);
+        requireAccess(userId, lovedOneId);
         return mediaFileRepository.findByLovedOneIdOrderByCreatedAtDesc(lovedOneId)
                 .stream().map(mf -> toMediaResponse(mf, true)).toList();
     }
 
     @Transactional(readOnly = true)
     public String mediaUrl(Long userId, Long lovedOneId, Long mediaId) {
-        requireOwned(userId, lovedOneId);
+        requireAccess(userId, lovedOneId);
         MediaFile mediaFile = mediaFileRepository.findByIdAndLovedOneId(mediaId, lovedOneId)
                 .orElseThrow(() -> new BusinessException(CODE_NOT_FOUND, "素材不存在"));
         return mediaStorage.presignedGetUrl(mediaFile.getObjectKey());
     }
 
-    private Family createDefaultFamily(Long userId, String userName) {
-        Family family = new Family();
-        family.setName((userName == null ? "我的" : userName) + "的家族");
-        family.setCreatorId(userId);
-        family.setStatus("ACTIVE");
-        return familyRepository.save(family);
-    }
-
-    private LovedOne requireOwned(Long userId, Long lovedOneId) {
+    private LovedOne requireAccess(Long userId, Long lovedOneId) {
         LovedOne lovedOne = lovedOneRepository.findById(lovedOneId)
                 .orElseThrow(() -> new BusinessException(CODE_NOT_FOUND, "档案不存在"));
-        if (!userId.equals(lovedOne.getCreatedBy())) {
+        if (!familyService.canAccess(userId, lovedOne.getFamilyId())) {
             throw new BusinessException(CODE_FORBIDDEN, "无权访问该档案");
         }
         return lovedOne;

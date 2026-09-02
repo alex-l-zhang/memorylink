@@ -1,0 +1,29 @@
+# Java / Maven
+server/target/
+*.class
+*.jar
+
+# Node
+node_modules/
+dist/
+*.local
+
+# Flutter / Dart
+app/.dart_tool/
+app/build/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# 环境与系统
+.env
+.DS_Store
+*.log
+
+# 测试产物
+coverage/
+*.html

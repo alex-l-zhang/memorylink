@@ -64,3 +64,30 @@ class ChatResult {
         usageHint: json['usageHint'] as String?,
       );
 }
+
+class MediaItem {
+  final int id;
+  final int lovedOneId;
+  final String mediaType;
+  final String? objectKey;
+  final int? sizeBytes;
+  final String? url;
+
+  MediaItem({
+    required this.id,
+    required this.lovedOneId,
+    required this.mediaType,
+    this.objectKey,
+    this.sizeBytes,
+    this.url,
+  });
+
+  factory MediaItem.fromJson(Map<String, dynamic> json) => MediaItem(
+        id: (json['id'] as num).toInt(),
+        lovedOneId: (json['lovedOneId'] as num).toInt(),
+        mediaType: json['mediaType'] as String? ?? '',
+        objectKey: json['objectKey'] as String?,
+        sizeBytes: (json['sizeBytes'] as num?)?.toInt(),
+        url: json['url'] as String?,
+      );
+}

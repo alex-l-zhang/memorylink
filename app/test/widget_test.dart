@@ -55,6 +55,8 @@ void main() {
     expect(find.text('张爷爷 的档案'), findsOneWidget);
     expect(find.text('去聊天'), findsOneWidget);
     expect(find.text('编辑资料'), findsOneWidget);
+    expect(find.text('添加照片'), findsOneWidget);
+    expect(find.text('添加录音'), findsOneWidget);
 
     await tester.tap(find.text('编辑资料'));
     await tester.pump();

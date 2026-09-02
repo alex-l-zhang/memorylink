@@ -66,6 +66,11 @@ cd admin && npm install && npm run dev # 平台后台管理（默认 5174）
 
 后续 UI 开发时补充：`npm install antd axios react-router-dom`。
 
+开发服务器监听 0.0.0.0（局域网可访问），并把 `/api` 代理到本机后端 8080：
+
+- B 端机构后台：http://192.168.32.128:5173
+- 平台后台管理：http://192.168.32.128:5174
+
 ## 环境变量
 
 复制 `.env.example` 为 `.env` 并按需修改；服务端通过环境变量读取数据库、Redis、对象存储与 DeepSeek 配置。

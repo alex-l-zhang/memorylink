@@ -30,12 +30,22 @@ docker compose -f docker-compose.dev.yml up -d
 
 ```bash
 cd server
+set -a && source ../.env && set +a   # 加载 .env（含 DeepSeek API Key 等）
 mvn spring-boot:run
 ```
 
 接口文档（springdoc）：启动后访问 http://localhost:8080/swagger-ui.html
 
 健康检查：http://localhost:8080/actuator/health
+
+首次使用请先配置 API Key：
+
+```bash
+# 复制示例并填入真实 Key（.env 已被 .gitignore 忽略，不会提交）
+cp .env.example .env
+# 编辑 .env，修改这一行：
+#   DEEPSEEK_API_KEY=sk-你的真实Key
+```
 
 ### 3. C 端 App（Flutter）
 

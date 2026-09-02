@@ -76,6 +76,18 @@ public class LovedOneService {
     }
 
     @Transactional
+    public LovedOneResponse update(Long userId, Long id, LovedOneRequest request) {
+        LovedOne lovedOne = requireAccess(userId, id);
+        lovedOne.setName(request.name());
+        lovedOne.setBirthDate(request.birthDate());
+        lovedOne.setDeathDate(request.deathDate());
+        lovedOne.setBirthPlace(request.birthPlace());
+        lovedOne.setBio(request.bio());
+        lovedOne = lovedOneRepository.save(lovedOne);
+        return toResponse(lovedOne);
+    }
+
+    @Transactional
     public MediaResponse uploadMedia(Long userId, Long lovedOneId, String mediaType, MultipartFile file) {
         LovedOne lovedOne = requireAccess(userId, lovedOneId);
         String type = mediaType == null ? "" : mediaType.trim().toUpperCase();

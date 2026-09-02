@@ -80,6 +80,23 @@ class LovedOneServiceTest {
     }
 
     @Test
+    void updateSavesChangedFields() {
+        LovedOne existing = new LovedOne();
+        existing.setId(1L);
+        existing.setFamilyId(9L);
+        existing.setName("张爷爷");
+        when(lovedOneRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(familyService.canAccess(1L, 9L)).thenReturn(true);
+        when(lovedOneRepository.save(any(LovedOne.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        LovedOneResponse response = service.update(1L, 1L,
+                new LovedOneRequest("张爷爷", LocalDate.of(1940, 1, 1), LocalDate.of(2020, 5, 1), "浙江绍兴", "补充的生平"));
+
+        assertThat(response.birthPlace()).isEqualTo("浙江绍兴");
+        assertThat(response.bio()).isEqualTo("补充的生平");
+    }
+
+    @Test
     void uploadMediaStoresObjectAndSavesRecord() throws Exception {
         LovedOne lovedOne = new LovedOne();
         lovedOne.setId(1L);

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api/api_client.dart';
 import '../models.dart';
-import 'chat_screen.dart';
+import 'archive_detail_screen.dart';
 import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -139,11 +139,15 @@ class _HomeScreenState extends State<HomeScreen> {
             if (item.birthPlace != null) item.birthPlace!,
           ].join(' · ')),
           trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => ChatScreen(api: widget.api, token: widget.token, lovedOne: item),
-            ),
-          ),
+          onTap: () async {
+            await Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) =>
+                    ArchiveDetailScreen(api: widget.api, token: widget.token, lovedOne: item),
+              ),
+            );
+            if (mounted) _reload();
+          },
         );
       },
     );

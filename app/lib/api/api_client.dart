@@ -49,6 +49,25 @@ class ApiClient {
     return LovedOne.fromJson(data as Map<String, dynamic>);
   }
 
+  Future<LovedOne> updateLovedOne(
+    String token,
+    int id, {
+    required String name,
+    String? birthDate,
+    String? deathDate,
+    String? birthPlace,
+    String? bio,
+  }) async {
+    final data = await _put('/api/v1/lovedones/$id', {
+      'name': name,
+      'birthDate': birthDate == null || birthDate.isEmpty ? null : birthDate,
+      'deathDate': deathDate == null || deathDate.isEmpty ? null : deathDate,
+      'birthPlace': birthPlace == null || birthPlace.isEmpty ? null : birthPlace,
+      'bio': bio == null || bio.isEmpty ? null : bio,
+    }, token: token);
+    return LovedOne.fromJson(data as Map<String, dynamic>);
+  }
+
   Future<ChatResult> chat(String token, int lovedOneId, String question) async {
     final data = await _post('/api/v1/lovedones/$lovedOneId/chat', {'question': question}, token: token);
     return ChatResult.fromJson(data as Map<String, dynamic>);
@@ -66,6 +85,15 @@ class ApiClient {
 
   Future<dynamic> _post(String path, Map<String, dynamic> body, {String? token}) async {
     final response = await http.post(
+      Uri.parse('$baseUrl$path'),
+      headers: _headers(token),
+      body: jsonEncode(body),
+    );
+    return _decode(response);
+  }
+
+  Future<dynamic> _put(String path, Map<String, dynamic> body, {String? token}) async {
+    final response = await http.put(
       Uri.parse('$baseUrl$path'),
       headers: _headers(token),
       body: jsonEncode(body),

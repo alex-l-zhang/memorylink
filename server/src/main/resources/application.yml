@@ -38,5 +38,5 @@ memorylink:
     base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
     model: ${DEEPSEEK_MODEL:deepseek-v4-flash}
   jwt:
-    secret: ${JWT_SECRET:please-change-me-in-production}
+    secret: ${JWT_SECRET:please-change-me-in-production-0123456789}
     expire-seconds: ${JWT_EXPIRE_SECONDS:7200}

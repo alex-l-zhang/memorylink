@@ -1,27 +1,42 @@
 # 忆联 C 端 App（Flutter）
 
-本目录是 C 端移动 App 的占位工程。当前环境未安装 Flutter SDK，首次初始化请执行：
+家属端移动应用：登录/注册 → 记忆档案列表/创建 → 故事问答。
+
+## 运行
+
+Flutter SDK 已安装（/home/dev/flutter，stable 3.47.2）。
 
 ```bash
-# 1. 安装 Flutter SDK：https://docs.flutter.dev/get-started/install
-# 2. 在本目录初始化工程
+export PATH=/home/dev/flutter/bin:$PATH
 cd app
-flutter create --project-name memorylink_app --org com.memorylink .
+flutter pub get
+flutter run
 ```
 
-初始化完成后按需添加依赖（图片/音频上传、推送、http 等），并在 `lib/` 下按模块组织：
+默认连接后端 `http://192.168.32.128:8080`；Android 模拟器访问宿主机请覆盖：
+
+```bash
+flutter run --dart-define=API_BASE=http://10.0.2.2:8080
+```
+
+## 测试
+
+```bash
+flutter analyze
+flutter test
+```
+
+## 结构
 
 ```text
 lib/
-├── main.dart
-├── core/        # 网络、配置、统一响应
-├── features/
-│   ├── auth/    # 登录注册
-│   ├── home/    # 首页/节日关怀
-│   ├── archive/ # 记忆档案/记忆馆
-│   ├── family/  # 家族树
-│   └── chat/    # 故事问答
-└── widgets/     # 公共组件
+├── main.dart                 # 入口，可配置 API 地址
+├── models.dart               # AuthResult / LovedOne / ChatResult
+├── api/api_client.dart       # 登录/注册/档案/问答 HTTP 客户端
+└── screens/
+    ├── login_screen.dart     # 登录/注册
+    ├── home_screen.dart      # 记忆档案列表/创建
+    └── chat_screen.dart      # 故事问答（含 AI 标识）
 ```
 
-接口文档见服务端 `/api/v1`（启动后访问 http://localhost:8080/swagger-ui.html）。
+生成平台：android、ios（如需桌面/Web 预览可再执行 `flutter create --platforms=linux,windows,macos,web .`）。

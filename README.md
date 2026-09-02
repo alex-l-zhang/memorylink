@@ -49,13 +49,18 @@ cp .env.example .env
 
 ### 3. C 端 App（Flutter）
 
-需要先安装 Flutter SDK（https://docs.flutter.dev/get-started/install），然后：
+Flutter SDK 已安装（stable 3.47.2），家属端工程已初始化（登录 → 记忆档案 → 故事问答 最小页面 + widget 测试）：
 
 ```bash
+export PATH=/home/dev/flutter/bin:$PATH
 cd app
-flutter create --project-name memorylink_app --org com.memorylink .
+flutter pub get
 flutter run
 ```
+
+Android 模拟器联调本机后端：`flutter run --dart-define=API_BASE=http://10.0.2.2:8080`
+
+页面测试：`flutter analyze && flutter test`
 
 ### 4. B 端 / 后台管理
 

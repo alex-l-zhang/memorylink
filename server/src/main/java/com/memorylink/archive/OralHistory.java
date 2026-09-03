@@ -32,6 +32,9 @@ public class OralHistory {
     @Column(name = "uploaded_by", nullable = false)
     private Long uploadedBy;
 
+    @Column(nullable = false, length = 20)
+    private String visibility = "FAMILY";
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -86,6 +89,14 @@ public class OralHistory {
 
     public void setUploadedBy(Long uploadedBy) {
         this.uploadedBy = uploadedBy;
+    }
+
+    public String getVisibility() {
+        return visibility;
+    }
+
+    public void setVisibility(String visibility) {
+        this.visibility = visibility;
     }
 
     public Instant getCreatedAt() {

@@ -161,6 +161,7 @@ public class LovedOneService {
                 lovedOne.getBirthPlace(),
                 lovedOne.getBio(),
                 lovedOne.getStatus(),
+                lovedOne.isDeceased(),
                 lovedOne.getCreatedAt()
         );
     }

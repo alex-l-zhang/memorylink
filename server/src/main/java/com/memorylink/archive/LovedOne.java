@@ -43,6 +43,18 @@ public class LovedOne {
     @Column(name = "created_by")
     private Long createdBy;
 
+    @Column(name = "is_deceased", nullable = false)
+    private boolean isDeceased = true;
+
+    @Column(name = "ai_persona_enabled", nullable = false)
+    private boolean aiPersonaEnabled = false;
+
+    @Column(name = "ai_enabled_by")
+    private Long aiEnabledBy;
+
+    @Column(name = "ai_enabled_at")
+    private Instant aiEnabledAt;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -134,6 +146,38 @@ public class LovedOne {
 
     public void setCreatedBy(Long createdBy) {
         this.createdBy = createdBy;
+    }
+
+    public boolean isDeceased() {
+        return isDeceased;
+    }
+
+    public void setDeceased(boolean deceased) {
+        isDeceased = deceased;
+    }
+
+    public boolean isAiPersonaEnabled() {
+        return aiPersonaEnabled;
+    }
+
+    public void setAiPersonaEnabled(boolean aiPersonaEnabled) {
+        this.aiPersonaEnabled = aiPersonaEnabled;
+    }
+
+    public Long getAiEnabledBy() {
+        return aiEnabledBy;
+    }
+
+    public void setAiEnabledBy(Long aiEnabledBy) {
+        this.aiEnabledBy = aiEnabledBy;
+    }
+
+    public Instant getAiEnabledAt() {
+        return aiEnabledAt;
+    }
+
+    public void setAiEnabledAt(Instant aiEnabledAt) {
+        this.aiEnabledAt = aiEnabledAt;
     }
 
     public Instant getCreatedAt() {

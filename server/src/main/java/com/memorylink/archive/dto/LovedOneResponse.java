@@ -12,6 +12,7 @@ public record LovedOneResponse(
         String birthPlace,
         String bio,
         String status,
+        boolean isDeceased,
         Instant createdAt
 ) {
 }

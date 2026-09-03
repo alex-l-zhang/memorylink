@@ -519,10 +519,12 @@ class _InviteDialog extends StatefulWidget {
 }
 
 class _InviteDialogState extends State<_InviteDialog> {
+  final TextEditingController _display = TextEditingController();
   String _role = 'VIEWER';
   bool _generating = false;
   bool _copied = false;
   String? _error;
+  String? _copyError;
   InviteKeyInfo? _key;
 
   Future<void> _generate() async {
@@ -537,7 +539,10 @@ class _InviteDialogState extends State<_InviteDialog> {
         role: _role,
       );
       if (!mounted) return;
-      setState(() => _key = key);
+      setState(() {
+        _key = key;
+        _display.text = key.code;
+      });
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (_) {
@@ -547,10 +552,27 @@ class _InviteDialogState extends State<_InviteDialog> {
     }
   }
 
+  @override
+  void dispose() {
+    _display.dispose();
+    super.dispose();
+  }
+
   Future<void> _copy() async {
     if (_key == null) return;
-    await Clipboard.setData(ClipboardData(text: _key!.code));
-    if (mounted) setState(() => _copied = true);
+    try {
+      await Clipboard.setData(ClipboardData(text: _key!.code));
+      if (mounted) {
+        setState(() {
+          _copied = true;
+          _copyError = null;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _copyError = '浏览器限制自动复制：请点击输入框，按 Ctrl+A 全选后 Ctrl+C 复制。');
+      }
+    }
   }
 
   @override
@@ -606,10 +628,13 @@ class _InviteDialogState extends State<_InviteDialog> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        SelectableText(
-          key.code,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+        TextField(
+          controller: _display,
+          readOnly: true,
           textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+          onTap: () => _display.selection =
+              TextSelection(baseOffset: 0, extentOffset: _display.text.length),
         ),
         const SizedBox(height: 12),
         FilledButton.tonalIcon(
@@ -617,6 +642,10 @@ class _InviteDialogState extends State<_InviteDialog> {
           icon: Icon(_copied ? Icons.check : Icons.copy),
           label: Text(_copied ? '已复制' : '复制邀请码'),
         ),
+        if (_copyError != null) ...[
+          const SizedBox(height: 8),
+          Text(_copyError!, style: const TextStyle(fontSize: 12, color: Colors.orangeAccent)),
+        ],
         const SizedBox(height: 8),
         Text('单次使用 · ${key.role == 'EDITOR' ? '共建' : '只读'}权限 · $expiresText',
             style: const TextStyle(fontSize: 12, color: Colors.grey)),

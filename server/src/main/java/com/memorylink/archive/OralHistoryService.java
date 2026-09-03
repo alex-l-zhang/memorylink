@@ -3,7 +3,10 @@ package com.memorylink.archive;
 import com.memorylink.archive.dto.OralHistoryResponse;
 import com.memorylink.common.BusinessException;
 import com.memorylink.family.FamilyService;
+import com.memorylink.family.Family;
 import com.memorylink.storage.MediaStorage;
+import com.memorylink.user.User;
+import com.memorylink.user.UserRepository;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -26,23 +29,48 @@ public class OralHistoryService {
     private final MediaFileRepository mediaFileRepository;
     private final FamilyService familyService;
     private final MediaStorage mediaStorage;
+    private final UserRepository userRepository;
 
     public OralHistoryService(OralHistoryRepository oralHistoryRepository,
                               LovedOneRepository lovedOneRepository,
                               MediaFileRepository mediaFileRepository,
                               FamilyService familyService,
-                              MediaStorage mediaStorage) {
+                              MediaStorage mediaStorage,
+                              UserRepository userRepository) {
         this.oralHistoryRepository = oralHistoryRepository;
         this.lovedOneRepository = lovedOneRepository;
         this.mediaFileRepository = mediaFileRepository;
         this.familyService = familyService;
         this.mediaStorage = mediaStorage;
+        this.userRepository = userRepository;
     }
 
     @Transactional
     public OralHistoryResponse upload(Long userId, Long lovedOneId, String mediaType,
                                       String title, String transcript, MultipartFile file) {
         LovedOne lovedOne = requireAccess(userId, lovedOneId);
+        return uploadInternal(userId, lovedOne, mediaType, title, transcript, file);
+    }
+
+    @Transactional
+    public OralHistoryResponse uploadMine(Long userId, String mediaType,
+                                          String title, String transcript, MultipartFile file) {
+        LovedOne mine = lovedOneRepository.findFirstByUserIdOrderByIdAsc(userId)
+                .filter(p -> !p.effectiveDeceased())
+                .orElseGet(() -> createSelfPerson(userId));
+        return uploadInternal(userId, mine, mediaType, title, transcript, file);
+    }
+
+    @Transactional(readOnly = true)
+    public List<OralHistoryResponse> listMine(Long userId) {
+        LovedOne mine = lovedOneRepository.findFirstByUserIdOrderByIdAsc(userId)
+                .filter(p -> !p.effectiveDeceased())
+                .orElse(null);
+        return mine == null ? List.of() : list(userId, mine.getId());
+    }
+
+    private OralHistoryResponse uploadInternal(Long userId, LovedOne lovedOne, String mediaType,
+                                               String title, String transcript, MultipartFile file) {
         String type = mediaType == null ? "" : mediaType.trim().toUpperCase();
         if (!MEDIA_TYPES.contains(type)) {
             throw new BusinessException(CODE_INVALID, "口述历史仅支持 AUDIO/VIDEO");
@@ -51,7 +79,7 @@ public class OralHistoryService {
             throw new BusinessException(CODE_INVALID, "文件不能为空");
         }
         String objectKey = "oral/%d/%s%s".formatted(
-                lovedOneId, UUID.randomUUID(), extensionOf(file.getOriginalFilename(), type));
+                lovedOne.getId(), UUID.randomUUID(), extensionOf(file.getOriginalFilename(), type));
         try {
             mediaStorage.put(objectKey, file.getInputStream(), file.getSize(),
                     file.getContentType() == null ? contentTypeOf(type) : file.getContentType());
@@ -60,7 +88,7 @@ public class OralHistoryService {
         }
 
         MediaFile mediaFile = new MediaFile();
-        mediaFile.setLovedOneId(lovedOneId);
+        mediaFile.setLovedOneId(lovedOne.getId());
         mediaFile.setUploaderId(userId);
         mediaFile.setMediaType(type);
         mediaFile.setObjectKey(objectKey);
@@ -69,7 +97,7 @@ public class OralHistoryService {
         mediaFile = mediaFileRepository.save(mediaFile);
 
         OralHistory oral = new OralHistory();
-        oral.setLovedOneId(lovedOneId);
+        oral.setLovedOneId(lovedOne.getId());
         oral.setMediaFileId(mediaFile.getId());
         oral.setTitle(title);
         oral.setTranscript(transcript);
@@ -77,6 +105,20 @@ public class OralHistoryService {
         oral.setVisibility(lovedOne.effectiveDeceased() ? "FAMILY" : "SELF_ONLY");
         oral = oralHistoryRepository.save(oral);
         return toResponse(oral);
+    }
+
+    private LovedOne createSelfPerson(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(CODE_ARCHIVE_NOT_FOUND, "用户不存在"));
+        Family family = familyService.getOrCreateDefaultFamily(userId, user.getName());
+        LovedOne person = new LovedOne();
+        person.setFamilyId(family.getId());
+        person.setName(user.getName() == null ? "我的讲述" : user.getName());
+        person.setCreatedBy(userId);
+        person.setUserId(userId);
+        person.setDeceased(false);
+        person.setStatus("ACTIVE");
+        return lovedOneRepository.save(person);
     }
 
     @Transactional(readOnly = true)

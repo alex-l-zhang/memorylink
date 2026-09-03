@@ -230,6 +230,39 @@ class ApiClient {
     _decode(response);
   }
 
+  Future<List<OralHistoryItem>> listMyOralHistories(String token) async {
+    final data = await _get('/api/v1/my/oral-histories', token: token);
+    return (data as List)
+        .map((e) => OralHistoryItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<OralHistoryItem> uploadMyOralHistory(
+    String token, {
+    required String mediaType,
+    String? title,
+    required String filename,
+    required Uint8List bytes,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/my/oral-histories');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $token'
+      ..fields['mediaType'] = mediaType
+      ..files.add(http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+        contentType: MediaType.parse(_contentTypeFor(filename)),
+      ));
+    if (title != null && title.isNotEmpty) {
+      request.fields['title'] = title;
+    }
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    final data = _decode(response);
+    return OralHistoryItem.fromJson(data as Map<String, dynamic>);
+  }
+
   Future<List<FamilyMemberInfo>> listFamilyMembers(String token, int familyId) async {
     final data = await _get('/api/v1/families/$familyId/members', token: token);
     return (data as List)

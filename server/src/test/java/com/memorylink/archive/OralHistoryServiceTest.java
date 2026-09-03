@@ -12,6 +12,9 @@ import com.memorylink.archive.dto.OralHistoryResponse;
 import com.memorylink.common.BusinessException;
 import com.memorylink.family.FamilyService;
 import com.memorylink.storage.MediaStorage;
+import com.memorylink.user.UserRepository;
+import com.memorylink.user.User;
+import com.memorylink.family.Family;
 import java.io.ByteArrayInputStream;
 import java.util.List;
 import java.util.Optional;
@@ -35,13 +38,15 @@ class OralHistoryServiceTest {
     private FamilyService familyService;
     @Mock
     private MediaStorage mediaStorage;
+    @Mock
+    private UserRepository userRepository;
 
     private OralHistoryService service;
 
     @BeforeEach
     void setUp() {
         service = new OralHistoryService(oralHistoryRepository, lovedOneRepository,
-                mediaFileRepository, familyService, mediaStorage);
+                mediaFileRepository, familyService, mediaStorage, userRepository);
     }
 
     private LovedOne person(boolean deceased) {
@@ -143,5 +148,34 @@ class OralHistoryServiceTest {
         assertThatThrownBy(() -> service.updateVisibility(2L, 1L, 1L, "FAMILY"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("仅讲述者本人");
+    }
+
+    @Test
+    void listMineWhenNoSelfPersonReturnsEmpty() {
+        when(lovedOneRepository.findFirstByUserIdOrderByIdAsc(2L)).thenReturn(Optional.empty());
+
+        assertThat(service.listMine(2L)).isEmpty();
+    }
+
+    @Test
+    void uploadMineCreatesSelfPersonAndDefaultsSelfOnly() throws Exception {
+        when(lovedOneRepository.findFirstByUserIdOrderByIdAsc(2L)).thenReturn(Optional.empty());
+        User user = new User();
+        user.setId(2L);
+        user.setName("小芳");
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user));
+        Family family = new Family();
+        family.setId(9L);
+        when(familyService.getOrCreateDefaultFamily(2L, "小芳")).thenReturn(family);
+        LovedOne self = new LovedOne();
+        self.setId(20L);
+        self.setFamilyId(9L);
+        self.setUserId(2L);
+        when(lovedOneRepository.save(any(LovedOne.class))).thenReturn(self);
+        stubMediaAndSave();
+
+        OralHistoryResponse response = service.uploadMine(2L, "AUDIO", "我的故事", null, audioFile());
+
+        assertThat(response.visibility()).isEqualTo("SELF_ONLY");
     }
 }

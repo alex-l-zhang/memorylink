@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../api/api_client.dart';
 import '../models.dart';
@@ -41,6 +42,10 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
   List<FamilyMemberInfo> _members = [];
   bool _consentsLoading = true;
   String? _consentsError;
+  List<OralHistoryItem> _orals = [];
+  bool _oralsLoading = true;
+  bool _oralUploading = false;
+  String? _oralsError;
 
   @override
   void initState() {
@@ -53,6 +58,7 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
     _bio = TextEditingController(text: _current.bio ?? '');
     _loadMedia();
     _loadConsents();
+    _loadOralHistories();
   }
 
   @override
@@ -140,6 +146,37 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
       }
     }
   }
+
+  Future<void> _loadOralHistories() async {
+    try {
+      final orals = await widget.api.listOralHistories(widget.token, _current.id);
+      if (!mounted) return;
+      setState(() {
+        _orals = orals;
+        _oralsLoading = false;
+        _oralsError = null;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _oralsLoading = false;
+          _oralsError = '口述历史加载失败';
+        });
+      }
+    }
+  }
+
+  bool get _isOralSelf =>
+      !_current.isEffectivelyDeceased && _current.userId == widget.userId;
+
+  bool get _isOralManager => _current.isEffectivelyDeceased
+      ? _members.any((m) =>
+          m.userId == widget.userId && (m.role == 'OWNER' || m.role == 'EDITOR'))
+      : _isOralSelf;
+
+  bool get _canAddOral => _current.isEffectivelyDeceased
+      ? _members.any((m) => m.userId == widget.userId)
+      : _isOralSelf;
 
   Future<void> _pickAndUpload(String mediaType) async {
     try {
@@ -292,6 +329,36 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
             const SizedBox(height: 4),
             const Text('故事问答需完成知情同意后可用。'),
           ],
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Text('口述历史', style: Theme.of(context).textTheme.titleMedium),
+              const Spacer(),
+              if (_canAddOral) ...[
+                IconButton(
+                  tooltip: '添加录音口述',
+                  onPressed: _oralUploading ? null : () => _uploadOral('AUDIO'),
+                  icon: const Icon(Icons.mic_none),
+                ),
+                IconButton(
+                  tooltip: '添加视频口述',
+                  onPressed: _oralUploading ? null : () => _uploadOral('VIDEO'),
+                  icon: const Icon(Icons.videocam_outlined),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_oralUploading)
+            const LinearProgressIndicator()
+          else if (_oralsLoading)
+            const LinearProgressIndicator()
+          else if (_oralsError != null)
+            Text(_oralsError!, style: TextStyle(color: Theme.of(context).colorScheme.error))
+          else if (_orals.isEmpty)
+            const Text('还没有口述历史。讲述者可录制自己的故事；故人档案可由家族成员上传音视频。')
+          else
+            ..._orals.map(_oralTile),
           const SizedBox(height: 24),
           Text('素材与记录', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
@@ -416,6 +483,144 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
     } catch (_) {
       _showSnack('操作失败，请稍后重试');
     }
+  }
+
+  Future<String?> _askOralTitle() async {
+    final controller = TextEditingController();
+    final title = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('口述标题（可留空）'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '例如：小时候的夏天'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('下一步'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return title;
+  }
+
+  Future<void> _uploadOral(String mediaType) async {
+    final title = await _askOralTitle();
+    if (!mounted) return;
+    try {
+      final file = await FilePicker.pickFile(
+        type: mediaType == 'AUDIO' ? FileType.audio : FileType.video,
+      );
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+      setState(() => _oralUploading = true);
+      await widget.api.uploadOralHistory(
+        widget.token,
+        _current.id,
+        mediaType: mediaType,
+        title: title,
+        filename: file.name.isEmpty ? 'oral' : file.name,
+        bytes: bytes,
+      );
+      if (!mounted) return;
+      await _loadOralHistories();
+      _showSnack('口述已上传');
+    } on ApiException catch (e) {
+      _showSnack(e.message);
+    } catch (_) {
+      _showSnack('上传失败，请确认后端服务已启动');
+    } finally {
+      if (mounted) setState(() => _oralUploading = false);
+    }
+  }
+
+  Future<void> _toggleOralVisibility(OralHistoryItem item) async {
+    final next = item.visibility == 'SELF_ONLY' ? 'FAMILY' : 'SELF_ONLY';
+    try {
+      await widget.api.updateOralVisibility(widget.token, _current.id, item.id, next);
+      await _loadOralHistories();
+      _showSnack('可见性已更新');
+    } on ApiException catch (e) {
+      _showSnack(e.message);
+    } catch (_) {
+      _showSnack('更新失败，请重试');
+    }
+  }
+
+  Future<void> _deleteOral(OralHistoryItem item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('删除这段口述？'),
+        content: const Text('删除后不可恢复，AI 引用会同步清除。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await widget.api.deleteOralHistory(widget.token, _current.id, item.id);
+      await _loadOralHistories();
+      _showSnack('已删除');
+    } on ApiException catch (e) {
+      _showSnack(e.message);
+    } catch (_) {
+      _showSnack('删除失败，请重试');
+    }
+  }
+
+  Future<void> _playOral(OralHistoryItem item) async {
+    final url = item.url;
+    if (url == null || url.isEmpty) {
+      _showSnack('暂无可播放地址');
+      return;
+    }
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (_) {
+      _showSnack('无法打开播放，请复制链接后在浏览器打开');
+    }
+  }
+
+  Widget _oralTile(OralHistoryItem item) {
+    final visLabel = item.visibility == 'SELF_ONLY' ? '仅本人可见' : '家族可见';
+    return ListTile(
+      leading: CircleAvatar(
+        child: Icon(item.mediaType == 'VIDEO' ? Icons.videocam : Icons.mic),
+      ),
+      title: Text(item.title == null || item.title!.isEmpty ? '未命名口述' : item.title!),
+      subtitle: Text('${item.mediaType == 'VIDEO' ? '视频' : '录音'} · $visLabel'),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_isOralManager)
+            IconButton(
+              tooltip: '切换可见性',
+              icon: Icon(
+                item.visibility == 'SELF_ONLY' ? Icons.lock_outline : Icons.group_outlined,
+              ),
+              onPressed: () => _toggleOralVisibility(item),
+            ),
+          if (_isOralManager)
+            IconButton(
+              tooltip: '删除',
+              icon: const Icon(Icons.close),
+              onPressed: () => _deleteOral(item),
+            ),
+        ],
+      ),
+      onTap: () => _playOral(item),
+    );
   }
 
   Widget _consentTile(ConsentRecord record) {

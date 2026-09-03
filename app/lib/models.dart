@@ -93,6 +93,42 @@ class UserProfile {
       );
 }
 
+class OralHistoryItem {
+  final int id;
+  final int lovedOneId;
+  final int mediaFileId;
+  final String? mediaType;
+  final String? title;
+  final String? transcript;
+  final String visibility;
+  final int uploadedBy;
+  final String? url;
+
+  OralHistoryItem({
+    required this.id,
+    required this.lovedOneId,
+    required this.mediaFileId,
+    this.mediaType,
+    this.title,
+    this.transcript,
+    required this.visibility,
+    required this.uploadedBy,
+    this.url,
+  });
+
+  factory OralHistoryItem.fromJson(Map<String, dynamic> json) => OralHistoryItem(
+        id: (json['id'] as num).toInt(),
+        lovedOneId: (json['lovedOneId'] as num).toInt(),
+        mediaFileId: (json['mediaFileId'] as num).toInt(),
+        mediaType: json['mediaType'] as String?,
+        title: json['title'] as String?,
+        transcript: json['transcript'] as String?,
+        visibility: json['visibility'] as String? ?? 'FAMILY',
+        uploadedBy: (json['uploadedBy'] as num?)?.toInt() ?? 0,
+        url: json['url'] as String?,
+      );
+}
+
 class ChatResult {
   final int conversationId;
   final String answer;

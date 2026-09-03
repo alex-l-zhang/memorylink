@@ -174,6 +174,62 @@ class ApiClient {
     return (data as Map<String, dynamic>)['enabled'] == false;
   }
 
+  Future<List<OralHistoryItem>> listOralHistories(String token, int lovedOneId) async {
+    final data = await _get('/api/v1/lovedones/$lovedOneId/oral-histories', token: token);
+    return (data as List)
+        .map((e) => OralHistoryItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<OralHistoryItem> uploadOralHistory(
+    String token,
+    int lovedOneId, {
+    required String mediaType,
+    String? title,
+    required String filename,
+    required Uint8List bytes,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/lovedones/$lovedOneId/oral-histories');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $token'
+      ..fields['mediaType'] = mediaType
+      ..files.add(http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+        contentType: MediaType.parse(_contentTypeFor(filename)),
+      ));
+    if (title != null && title.isNotEmpty) {
+      request.fields['title'] = title;
+    }
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    final data = _decode(response);
+    return OralHistoryItem.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<OralHistoryItem> updateOralVisibility(
+    String token,
+    int lovedOneId,
+    int oralHistoryId,
+    String visibility,
+  ) async {
+    final data = await _patch(
+      '/api/v1/lovedones/$lovedOneId/oral-histories/$oralHistoryId',
+      {'visibility': visibility},
+      token: token,
+    );
+    return OralHistoryItem.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteOralHistory(String token, int lovedOneId, int oralHistoryId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/api/v1/lovedones/$lovedOneId/oral-histories/$oralHistoryId'),
+      headers: _headers(token),
+    );
+    _decode(response);
+  }
+
   Future<List<FamilyMemberInfo>> listFamilyMembers(String token, int familyId) async {
     final data = await _get('/api/v1/families/$familyId/members', token: token);
     return (data as List)

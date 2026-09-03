@@ -38,7 +38,7 @@ management:
 
 memorylink:
   storage:
-    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    endpoint: ${MINIO_ENDPOINT:http://192.168.32.128:9000}
     access-key: ${MINIO_ACCESS_KEY:memorylink}
     secret-key: ${MINIO_SECRET_KEY:memorylink123}
     bucket: ${MINIO_BUCKET:memorylink}

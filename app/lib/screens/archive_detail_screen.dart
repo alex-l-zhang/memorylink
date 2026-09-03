@@ -275,7 +275,7 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
         : ' · ${(item.sizeBytes! / 1024).toStringAsFixed(1)}KB';
     return GestureDetector(
       onTap: item.mediaType == 'PHOTO' && item.url != null
-          ? () => _previewPhoto(item.url!)
+          ? () => _previewPhoto(item)
           : null,
       child: Tooltip(
         message: item.objectKey ?? item.mediaType,
@@ -315,7 +315,34 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
     );
   }
 
-  void _previewPhoto(String url) {
+  Future<void> _previewPhoto(MediaItem item) async {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    String url;
+    try {
+      url = await widget.api.getMediaUrl(widget.token, _current.id, item.id);
+    } on ApiException catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        _showSnack(e.message);
+      }
+      return;
+    } catch (_) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        _showSnack('获取图片地址失败，请重试');
+      }
+      return;
+    }
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    _showImagePreview(url);
+  }
+
+  void _showImagePreview(String url) {
     showDialog<void>(
       context: context,
       builder: (dialogContext) => Dialog(
@@ -332,12 +359,16 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
               child: Image.network(
                 url,
                 fit: BoxFit.contain,
-                errorBuilder: (_, _, _) => const Column(
+                errorBuilder: (_, _, _) => Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.broken_image_outlined, color: Colors.white70, size: 48),
-                    SizedBox(height: 8),
-                    Text('图片加载失败', style: TextStyle(color: Colors.white70)),
+                    const Icon(Icons.broken_image_outlined, color: Colors.white70, size: 48),
+                    const SizedBox(height: 8),
+                    const Text('图片加载失败', style: TextStyle(color: Colors.white70)),
+                    TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      child: const Text('关闭', style: TextStyle(color: Colors.white)),
+                    ),
                   ],
                 ),
               ),

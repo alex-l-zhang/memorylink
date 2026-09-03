@@ -82,6 +82,11 @@ class ApiClient {
         .toList();
   }
 
+  Future<String> getMediaUrl(String token, int lovedOneId, int mediaId) async {
+    final data = await _get('/api/v1/lovedones/$lovedOneId/media/$mediaId/url', token: token);
+    return (data as Map<String, dynamic>)['url'] as String;
+  }
+
   Future<MediaItem> uploadMedia(
     String token,
     int lovedOneId,

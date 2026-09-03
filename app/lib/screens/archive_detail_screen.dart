@@ -287,7 +287,17 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
               children: _media.map(_mediaCard).toList(),
             ),
           const SizedBox(height: 16),
-          Text('知情同意', style: Theme.of(context).textTheme.titleMedium),
+          Row(
+            children: [
+              Text('知情同意', style: Theme.of(context).textTheme.titleMedium),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: _openConsentDialog,
+                icon: const Icon(Icons.add),
+                label: const Text('提交授权'),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
           if (_consentsLoading)
             const LinearProgressIndicator()
@@ -300,6 +310,26 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _openConsentDialog() async {
+    if (_members.isEmpty) {
+      _showSnack('暂无可选确认人，请先邀请家族成员');
+      return;
+    }
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (_) => _ConsentDialog(
+        api: widget.api,
+        token: widget.token,
+        lovedOneId: _current.id,
+        members: _members,
+      ),
+    );
+    if (submitted == true && mounted) {
+      await _loadConsents();
+      _showSnack('授权记录已提交');
+    }
   }
 
   Widget _consentTile(ConsentRecord record) {
@@ -450,6 +480,124 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
     } catch (_) {
       _showSnack('删除失败，请重试');
     }
+  }
+}
+
+class _ConsentDialog extends StatefulWidget {
+  final ApiClient api;
+  final String token;
+  final int lovedOneId;
+  final List<FamilyMemberInfo> members;
+
+  const _ConsentDialog({
+    required this.api,
+    required this.token,
+    required this.lovedOneId,
+    required this.members,
+  });
+
+  @override
+  State<_ConsentDialog> createState() => _ConsentDialogState();
+}
+
+class _ConsentDialogState extends State<_ConsentDialog> {
+  String _type = 'TWO_RELATIVES';
+  final Set<int> _selected = {};
+  bool _submitting = false;
+  String? _error;
+
+  int get _required => _type == 'PRE_AUTHORIZED' ? 1 : 2;
+
+  void _submit() async {
+    if (_selected.length < _required) {
+      setState(() => _error = _type == 'PRE_AUTHORIZED'
+          ? '生前预授权至少选择 1 位确认人'
+          : '两名近亲共同确认至少选择 2 位确认人');
+      return;
+    }
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await widget.api.createConsent(
+        widget.token,
+        widget.lovedOneId,
+        _type,
+        _selected.toList(),
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = '提交失败，请稍后重试');
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('提交授权记录'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('授权类型'),
+            const SizedBox(height: 8),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'PRE_AUTHORIZED', label: Text('生前预授权')),
+                ButtonSegment(value: 'TWO_RELATIVES', label: Text('两名近亲确认')),
+              ],
+              selected: {_type},
+              onSelectionChanged: (selection) {
+                setState(() => _type = selection.first);
+              },
+            ),
+            const SizedBox(height: 16),
+            Text('确认人（至少 $_required 位）'),
+            const SizedBox(height: 4),
+            ...widget.members.map(
+              (m) => CheckboxListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                value: _selected.contains(m.userId),
+                title: Text(m.name ?? m.phone ?? '#${m.userId}'),
+                subtitle: m.phone == null ? null : Text(m.phone!),
+                onChanged: (checked) {
+                  setState(() {
+                    if (checked == true) {
+                      _selected.add(m.userId);
+                    } else {
+                      _selected.remove(m.userId);
+                    }
+                  });
+                },
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _submitting ? null : () => Navigator.pop(context, false),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: _submitting ? null : _submit,
+          child: Text(_submitting ? '提交中…' : '提交'),
+        ),
+      ],
+    );
   }
 }
 

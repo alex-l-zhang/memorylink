@@ -102,6 +102,20 @@ class ApiClient {
         .toList();
   }
 
+  Future<ConsentRecord> createConsent(
+    String token,
+    int lovedOneId,
+    String consentType,
+    List<int> consentorIds,
+  ) async {
+    final data = await _post(
+      '/api/v1/lovedones/$lovedOneId/consent',
+      {'consentType': consentType, 'consentorIds': consentorIds},
+      token: token,
+    );
+    return ConsentRecord.fromJson(data as Map<String, dynamic>);
+  }
+
   Future<List<FamilyMemberInfo>> listFamilyMembers(String token, int familyId) async {
     final data = await _get('/api/v1/families/$familyId/members', token: token);
     return (data as List)

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/api_client.dart';
+import '../auth/session_store.dart';
 import '../models.dart';
 import '../relation_options.dart';
 import 'archive_detail_screen.dart';
@@ -131,9 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             tooltip: '退出登录',
             icon: const Icon(Icons.logout),
-            onPressed: () => Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => LoginScreen(api: widget.api)),
-            ),
+            onPressed: _logout,
           ),
         ],
       ),
@@ -183,6 +182,14 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showSnack(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _logout() async {
+    await SessionStore.clear();
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => LoginScreen(api: widget.api)),
+    );
   }
 
   Widget _buildBody() {

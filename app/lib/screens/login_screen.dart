@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/api_client.dart';
+import '../auth/session_store.dart';
 import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -41,6 +42,11 @@ class _LoginScreenState extends State<LoginScreen> {
               password: _password.text,
             )
           : await widget.api.login(phone: _phone.text.trim(), password: _password.text);
+      await SessionStore.save(AuthSession(
+        token: result.token,
+        userId: result.userId,
+        phone: result.phone,
+      ));
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(

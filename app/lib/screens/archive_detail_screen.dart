@@ -273,38 +273,76 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
     final sizeLabel = item.sizeBytes == null
         ? ''
         : ' · ${(item.sizeBytes! / 1024).toStringAsFixed(1)}KB';
-    return Tooltip(
-      message: item.objectKey ?? item.mediaType,
-      child: Container(
-        width: 110,
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade300),
-          borderRadius: BorderRadius.circular(8),
+    return GestureDetector(
+      onTap: item.mediaType == 'PHOTO' && item.url != null
+          ? () => _previewPhoto(item.url!)
+          : null,
+      child: Tooltip(
+        message: item.objectKey ?? item.mediaType,
+        child: Container(
+          width: 110,
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              SizedBox(
+                height: 80,
+                width: double.infinity,
+                child: item.mediaType == 'PHOTO' && item.url != null
+                    ? Image.network(
+                        item.url!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) =>
+                            const Icon(Icons.broken_image_outlined, size: 40),
+                      )
+                    : const Icon(Icons.graphic_eq, size: 40),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(4),
+                child: Text(
+                  '${item.mediaType == 'PHOTO' ? '照片' : '录音'}$sizeLabel',
+                  style: const TextStyle(fontSize: 11),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
         ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          children: [
-            SizedBox(
-              height: 80,
-              width: double.infinity,
-              child: item.mediaType == 'PHOTO' && item.url != null
-                  ? Image.network(
-                      item.url!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) =>
-                          const Icon(Icons.broken_image_outlined, size: 40),
-                    )
-                  : const Icon(Icons.graphic_eq, size: 40),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(4),
-              child: Text(
-                '${item.mediaType == 'PHOTO' ? '照片' : '录音'}$sizeLabel',
-                style: const TextStyle(fontSize: 11),
-                overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  void _previewPhoto(String url) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: const EdgeInsets.all(12),
+        child: GestureDetector(
+          onTap: () => Navigator.of(dialogContext).pop(),
+          child: InteractiveViewer(
+            minScale: 0.8,
+            maxScale: 5,
+            child: SizedBox(
+              width: MediaQuery.of(dialogContext).size.width - 24,
+              height: MediaQuery.of(dialogContext).size.height * 0.8,
+              child: Image.network(
+                url,
+                fit: BoxFit.contain,
+                errorBuilder: (_, _, _) => const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.broken_image_outlined, color: Colors.white70, size: 48),
+                    SizedBox(height: 8),
+                    Text('图片加载失败', style: TextStyle(color: Colors.white70)),
+                  ],
+                ),
               ),
             ),
-          ],
+          ),
         ),
       ),
     );

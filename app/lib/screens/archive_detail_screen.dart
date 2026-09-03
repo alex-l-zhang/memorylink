@@ -520,6 +520,7 @@ class _InviteDialog extends StatefulWidget {
 
 class _InviteDialogState extends State<_InviteDialog> {
   final TextEditingController _display = TextEditingController();
+  final FocusNode _codeFocus = FocusNode();
   String _role = 'VIEWER';
   bool _generating = false;
   bool _copied = false;
@@ -555,6 +556,7 @@ class _InviteDialogState extends State<_InviteDialog> {
   @override
   void dispose() {
     _display.dispose();
+    _codeFocus.dispose();
     super.dispose();
   }
 
@@ -570,7 +572,10 @@ class _InviteDialogState extends State<_InviteDialog> {
       }
     } catch (_) {
       if (mounted) {
-        setState(() => _copyError = '浏览器限制自动复制：请点击输入框，按 Ctrl+A 全选后 Ctrl+C 复制。');
+        _codeFocus.requestFocus();
+        _display.selection =
+            TextSelection(baseOffset: 0, extentOffset: _display.text.length);
+        setState(() => _copyError = '浏览器限制自动复制：已为你全选邀请码，请按 Ctrl+C（Mac：Cmd+C）。');
       }
     }
   }
@@ -630,6 +635,7 @@ class _InviteDialogState extends State<_InviteDialog> {
       children: [
         TextField(
           controller: _display,
+          focusNode: _codeFocus,
           readOnly: true,
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.2),

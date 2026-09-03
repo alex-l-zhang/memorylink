@@ -60,6 +60,14 @@ public class FamilyService {
     }
 
     @Transactional(readOnly = true)
+    public boolean canManage(Long userId, Long familyId) {
+        return familyMemberRepository.findByFamilyIdAndUserId(familyId, userId)
+                .filter(m -> "ACTIVE".equals(m.getStatus()))
+                .map(m -> "OWNER".equals(m.getRole()) || "EDITOR".equals(m.getRole()))
+                .orElse(false);
+    }
+
+    @Transactional(readOnly = true)
     public List<FamilyMember> membersOf(Long familyId) {
         return familyMemberRepository.findByFamilyId(familyId);
     }

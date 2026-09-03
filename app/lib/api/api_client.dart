@@ -116,6 +116,33 @@ class ApiClient {
     return ConsentRecord.fromJson(data as Map<String, dynamic>);
   }
 
+  Future<InviteKeyInfo> generateInviteKey(
+    String token,
+    int lovedOneId, {
+    String role = 'VIEWER',
+    int hours = 72,
+  }) async {
+    final data = await _post(
+      '/api/v1/lovedones/$lovedOneId/invite-key',
+      {'role': role, 'hours': hours},
+      token: token,
+    );
+    return InviteKeyInfo.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<ClaimResult> claimInvite(
+    String token,
+    String code,
+    String relation,
+  ) async {
+    final data = await _post(
+      '/api/v1/invites/claim',
+      {'code': code, 'relation': relation},
+      token: token,
+    );
+    return ClaimResult.fromJson(data as Map<String, dynamic>);
+  }
+
   Future<List<FamilyMemberInfo>> listFamilyMembers(String token, int familyId) async {
     final data = await _get('/api/v1/families/$familyId/members', token: token);
     return (data as List)

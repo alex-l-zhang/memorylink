@@ -141,3 +141,45 @@ class ConsentRecord {
         status: json['status'] as String? ?? '',
       );
 }
+
+class InviteKeyInfo {
+  final String code;
+  final int lovedOneId;
+  final String role;
+  final String? expiresAt;
+
+  InviteKeyInfo({
+    required this.code,
+    required this.lovedOneId,
+    required this.role,
+    this.expiresAt,
+  });
+
+  factory InviteKeyInfo.fromJson(Map<String, dynamic> json) => InviteKeyInfo(
+        code: json['code'] as String? ?? '',
+        lovedOneId: (json['lovedOneId'] as num).toInt(),
+        role: json['role'] as String? ?? 'VIEWER',
+        expiresAt: json['expiresAt'] as String?,
+      );
+}
+
+class ClaimResult {
+  final int familyId;
+  final String role;
+  final String relation;
+  final String message;
+
+  ClaimResult({
+    required this.familyId,
+    required this.role,
+    required this.relation,
+    required this.message,
+  });
+
+  factory ClaimResult.fromJson(Map<String, dynamic> json) => ClaimResult(
+        familyId: (json['familyId'] as num).toInt(),
+        role: json['role'] as String? ?? '',
+        relation: json['relation'] as String? ?? '',
+        message: json['message'] as String? ?? '',
+      );
+}

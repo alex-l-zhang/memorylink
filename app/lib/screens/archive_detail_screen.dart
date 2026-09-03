@@ -174,7 +174,16 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('${_current.name} 的档案')),
+      appBar: AppBar(
+        title: Text('${_current.name} 的档案'),
+        actions: [
+          IconButton(
+            tooltip: '邀请家人',
+            icon: const Icon(Icons.person_add_alt_outlined),
+            onPressed: _openInviteDialog,
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -332,6 +341,17 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
     }
   }
 
+  Future<void> _openInviteDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _InviteDialog(
+        api: widget.api,
+        token: widget.token,
+        lovedOneId: _current.id,
+      ),
+    );
+  }
+
   Widget _consentTile(ConsentRecord record) {
     final names = record.consentorIds
         .map((id) => _members
@@ -480,6 +500,128 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
     } catch (_) {
       _showSnack('删除失败，请重试');
     }
+  }
+}
+
+class _InviteDialog extends StatefulWidget {
+  final ApiClient api;
+  final String token;
+  final int lovedOneId;
+
+  const _InviteDialog({
+    required this.api,
+    required this.token,
+    required this.lovedOneId,
+  });
+
+  @override
+  State<_InviteDialog> createState() => _InviteDialogState();
+}
+
+class _InviteDialogState extends State<_InviteDialog> {
+  String _role = 'VIEWER';
+  bool _generating = false;
+  bool _copied = false;
+  String? _error;
+  InviteKeyInfo? _key;
+
+  Future<void> _generate() async {
+    setState(() {
+      _generating = true;
+      _error = null;
+    });
+    try {
+      final key = await widget.api.generateInviteKey(
+        widget.token,
+        widget.lovedOneId,
+        role: _role,
+      );
+      if (!mounted) return;
+      setState(() => _key = key);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = '生成失败，请稍后重试');
+    } finally {
+      if (mounted) setState(() => _generating = false);
+    }
+  }
+
+  Future<void> _copy() async {
+    if (_key == null) return;
+    await Clipboard.setData(ClipboardData(text: _key!.code));
+    if (mounted) setState(() => _copied = true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(_key == null ? '邀请家人' : '邀请码已生成'),
+      content: _key == null ? _buildPickRole() : _buildShowCode(),
+      actions: [
+        TextButton(
+          onPressed: _generating ? null : () => Navigator.pop(context),
+          child: const Text('关闭'),
+        ),
+        if (_key == null)
+          FilledButton(
+            onPressed: _generating ? null : _generate,
+            child: Text(_generating ? '生成中…' : '生成邀请码'),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildPickRole() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('对方加入后获得的权限'),
+        const SizedBox(height: 8),
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(value: 'VIEWER', label: Text('只读')),
+            ButtonSegment(value: 'EDITOR', label: Text('共建')),
+          ],
+          selected: {_role},
+          onSelectionChanged: (selection) => setState(() => _role = selection.first),
+        ),
+        const SizedBox(height: 12),
+        const Text('邀请码为 16 位，72 小时内有效、仅可使用一次，请通过可信渠道发送给家人。'),
+        if (_error != null) ...[
+          const SizedBox(height: 8),
+          Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildShowCode() {
+    final key = _key!;
+    final expires = DateTime.tryParse(key.expiresAt ?? '')?.toLocal();
+    final expiresText = expires == null
+        ? ''
+        : '有效期至 ${expires.year}-${expires.month.toString().padLeft(2, '0')}-${expires.day.toString().padLeft(2, '0')} ${expires.hour.toString().padLeft(2, '0')}:${expires.minute.toString().padLeft(2, '0')}';
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SelectableText(
+          key.code,
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 12),
+        FilledButton.tonalIcon(
+          onPressed: _copy,
+          icon: Icon(_copied ? Icons.check : Icons.copy),
+          label: Text(_copied ? '已复制' : '复制邀请码'),
+        ),
+        const SizedBox(height: 8),
+        Text('单次使用 · ${key.role == 'EDITOR' ? '共建' : '只读'}权限 · $expiresText',
+            style: const TextStyle(fontSize: 12, color: Colors.grey)),
+      ],
+    );
   }
 }
 

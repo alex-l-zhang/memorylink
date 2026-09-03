@@ -32,6 +32,12 @@ public class FamilyMember {
     @Column(nullable = false, length = 20)
     private String status = "ACTIVE";
 
+    @Column(name = "evidence_status", nullable = false, length = 20)
+    private String evidenceStatus = "SELF_DECLARED";
+
+    @Column(name = "relation_source", length = 30)
+    private String relationSource;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -43,6 +49,9 @@ public class FamilyMember {
         }
         if (status == null) {
             status = "ACTIVE";
+        }
+        if (evidenceStatus == null) {
+            evidenceStatus = "SELF_DECLARED";
         }
     }
 
@@ -96,5 +105,21 @@ public class FamilyMember {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public String getEvidenceStatus() {
+        return evidenceStatus;
+    }
+
+    public void setEvidenceStatus(String evidenceStatus) {
+        this.evidenceStatus = evidenceStatus;
+    }
+
+    public String getRelationSource() {
+        return relationSource;
+    }
+
+    public void setRelationSource(String relationSource) {
+        this.relationSource = relationSource;
     }
 }

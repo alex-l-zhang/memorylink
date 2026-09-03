@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api/api_client.dart';
 import '../models.dart';
+import '../relation_options.dart';
 import 'archive_detail_screen.dart';
 import 'login_screen.dart';
 
@@ -80,6 +81,11 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('记忆档案'),
         actions: [
           IconButton(
+            tooltip: '用邀请码加入纪念馆',
+            icon: const Icon(Icons.group_add_outlined),
+            onPressed: _openClaimDialog,
+          ),
+          IconButton(
             tooltip: '退出登录',
             icon: const Icon(Icons.logout),
             onPressed: () => Navigator.of(context).pushReplacement(
@@ -98,6 +104,22 @@ class _HomeScreenState extends State<HomeScreen> {
         child: _buildBody(),
       ),
     );
+  }
+
+  Future<void> _openClaimDialog() async {
+    final claimed = await showDialog<bool>(
+      context: context,
+      builder: (_) => _ClaimDialog(api: widget.api, token: widget.token),
+    );
+    if (claimed == true && mounted) {
+      await _reload();
+      _showSnack('已加入纪念馆');
+    }
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Widget _buildBody() {
@@ -150,6 +172,96 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         );
       },
+    );
+  }
+}
+
+class _ClaimDialog extends StatefulWidget {
+  final ApiClient api;
+  final String token;
+
+  const _ClaimDialog({required this.api, required this.token});
+
+  @override
+  State<_ClaimDialog> createState() => _ClaimDialogState();
+}
+
+class _ClaimDialogState extends State<_ClaimDialog> {
+  final _code = TextEditingController();
+  String _relation = 'CHILD';
+  bool _submitting = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _code.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await widget.api.claimInvite(
+        widget.token,
+        _code.text.trim(),
+        _relation,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = '加入失败，请稍后重试');
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('用邀请码加入纪念馆'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _code,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: '邀请码（如 ABCD-EFGH-JKLM-NPQR）',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            initialValue: _relation,
+            decoration: const InputDecoration(labelText: '你与故人的关系', border: OutlineInputBorder()),
+            items: relationOptions
+                .map((o) => DropdownMenuItem(value: o.code, child: Text(o.label)))
+                .toList(),
+            onChanged: (value) {
+              if (value != null) setState(() => _relation = value);
+            },
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _submitting ? null : () => Navigator.pop(context, false),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: _submitting ? null : _submit,
+          child: Text(_submitting ? '加入中…' : '加入'),
+        ),
+      ],
     );
   }
 }

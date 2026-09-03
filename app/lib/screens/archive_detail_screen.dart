@@ -261,7 +261,7 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          if (!_current.isDeceased && _current.userId == widget.userId) ...[
+          if (!_current.isEffectivelyDeceased && _current.userId == widget.userId) ...[
             Text('AI 讲述', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             Card(
@@ -286,7 +286,7 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
               ),
             ),
           ],
-          if (_current.isDeceased) ...[
+          if (_current.isEffectivelyDeceased) ...[
             const SizedBox(height: 16),
             Text('故人档案', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),

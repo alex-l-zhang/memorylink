@@ -163,6 +163,16 @@ public class LovedOne {
         return isDeceased;
     }
 
+    /**
+     * 展示/门禁统一使用推导状态：逝世日期为空或晚于今天均视为在世。
+     */
+    public boolean effectiveDeceased() {
+        if (deathDate == null) {
+            return false;
+        }
+        return !deathDate.isAfter(LocalDate.now());
+    }
+
     public void setDeceased(boolean deceased) {
         isDeceased = deceased;
     }

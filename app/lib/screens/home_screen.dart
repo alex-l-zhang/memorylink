@@ -209,7 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
           leading: const CircleAvatar(child: Icon(Icons.person)),
           title: Text(item.name),
           subtitle: Text([
-            item.isDeceased ? '故人' : '在世',
+            item.isEffectivelyDeceased ? '故人' : '在世',
             if (item.birthDate != null) '生 ${item.birthDate}',
             if (item.deathDate != null) '卒 ${item.deathDate}',
             if (item.birthPlace != null) item.birthPlace!,

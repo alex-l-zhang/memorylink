@@ -49,7 +49,6 @@ class PersonaServiceTest {
         LovedOne lovedOne = new LovedOne();
         lovedOne.setId(1L);
         lovedOne.setUserId(1L);
-        lovedOne.setDeceased(false);
         return lovedOne;
     }
 
@@ -68,7 +67,7 @@ class PersonaServiceTest {
     @Test
     void enableForDeceasedRejected() {
         LovedOne deceased = livingBound();
-        deceased.setDeceased(true);
+        deceased.setDeathDate(LocalDate.of(2020, 1, 1));
         when(lovedOneRepository.findById(1L)).thenReturn(Optional.of(deceased));
 
         assertThatThrownBy(() -> personaService.enable(1L, 1L))

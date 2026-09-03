@@ -122,7 +122,7 @@ public class QaService {
         if (!UserAge.isAdult(user)) {
             throw new BusinessException(CODE_ADULT_REQUIRED, "需年满 18 周岁且已完善出生日期后使用故事问答");
         }
-        if (lovedOne.isDeceased()) {
+        if (lovedOne.effectiveDeceased()) {
             boolean consented = consentRecordRepository
                     .findFirstByLovedOneIdOrderByCreatedAtDesc(lovedOne.getId())
                     .filter(c -> "VALID".equals(c.getStatus()))

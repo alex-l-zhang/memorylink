@@ -64,6 +64,17 @@ class LovedOne {
         aiPersonaEnabled: aiPersonaEnabled ?? this.aiPersonaEnabled,
         userId: userId ?? this.userId,
       );
+
+  bool get isEffectivelyDeceased {
+    final raw = deathDate;
+    if (raw == null || raw.isEmpty) return false;
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return false;
+    final today = DateTime.now();
+    final date = DateTime(parsed.year, parsed.month, parsed.day);
+    final now = DateTime(today.year, today.month, today.day);
+    return !date.isAfter(now);
+  }
 }
 
 class UserProfile {

@@ -11,6 +11,7 @@ import com.memorylink.storage.MediaStorage;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import java.time.LocalDate;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,6 +54,7 @@ public class LovedOneService {
         lovedOne.setBio(request.bio());
         lovedOne.setCreatedBy(userId);
         lovedOne.setStatus("ACTIVE");
+        lovedOne.setDeceased(isDeceasedByDate(request.deathDate()));
         lovedOne = lovedOneRepository.save(lovedOne);
         return toResponse(lovedOne);
     }
@@ -83,6 +85,7 @@ public class LovedOneService {
         lovedOne.setDeathDate(request.deathDate());
         lovedOne.setBirthPlace(request.birthPlace());
         lovedOne.setBio(request.bio());
+        lovedOne.setDeceased(isDeceasedByDate(request.deathDate()));
         lovedOne = lovedOneRepository.save(lovedOne);
         return toResponse(lovedOne);
     }
@@ -161,11 +164,15 @@ public class LovedOneService {
                 lovedOne.getBirthPlace(),
                 lovedOne.getBio(),
                 lovedOne.getStatus(),
-                lovedOne.isDeceased(),
+                lovedOne.effectiveDeceased(),
                 lovedOne.isAiPersonaEnabled(),
                 lovedOne.getUserId(),
                 lovedOne.getCreatedAt()
         );
+    }
+
+    private boolean isDeceasedByDate(LocalDate deathDate) {
+        return deathDate != null && !deathDate.isAfter(LocalDate.now());
     }
 
     private MediaResponse toMediaResponse(MediaFile mediaFile, boolean withUrl) {

@@ -66,8 +66,16 @@ class QaServiceTest {
         lovedOne.setFamilyId(9L);
         lovedOne.setName("张爷爷");
         lovedOne.setBirthPlace("上海");
-        lovedOne.setDeceased(false);
         lovedOne.setAiPersonaEnabled(true);
+        return lovedOne;
+    }
+
+    private LovedOne deceasedPerson() {
+        LovedOne lovedOne = new LovedOne();
+        lovedOne.setId(1L);
+        lovedOne.setFamilyId(9L);
+        lovedOne.setName("张爷爷");
+        lovedOne.setDeathDate(LocalDate.of(2020, 1, 1));
         return lovedOne;
     }
 
@@ -118,10 +126,7 @@ class QaServiceTest {
 
     @Test
     void deceasedWithoutConsentRejected() {
-        LovedOne deceased = new LovedOne();
-        deceased.setId(1L);
-        deceased.setFamilyId(9L);
-        deceased.setDeceased(true);
+        LovedOne deceased = deceasedPerson();
         when(lovedOneRepository.findById(1L)).thenReturn(Optional.of(deceased));
         when(familyService.canAccess(1L, 9L)).thenReturn(true);
         when(userRepository.findById(1L)).thenReturn(Optional.of(adultUser()));
@@ -135,10 +140,7 @@ class QaServiceTest {
 
     @Test
     void deceasedWithValidConsentAllowed() {
-        LovedOne deceased = new LovedOne();
-        deceased.setId(1L);
-        deceased.setFamilyId(9L);
-        deceased.setDeceased(true);
+        LovedOne deceased = deceasedPerson();
         when(lovedOneRepository.findById(1L)).thenReturn(Optional.of(deceased));
         when(familyService.canAccess(1L, 9L)).thenReturn(true);
         when(userRepository.findById(1L)).thenReturn(Optional.of(adultUser()));

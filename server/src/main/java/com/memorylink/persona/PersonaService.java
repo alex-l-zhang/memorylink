@@ -38,7 +38,7 @@ public class PersonaService {
     public AiConsentResponse enable(Long userId, Long lovedOneId) {
         LovedOne lovedOne = lovedOneRepository.findById(lovedOneId)
                 .orElseThrow(() -> new BusinessException(CODE_ARCHIVE_NOT_FOUND, "档案不存在"));
-        if (lovedOne.isDeceased()) {
+        if (lovedOne.effectiveDeceased()) {
             throw new BusinessException(CODE_REQUIRE_CONSENT, "该档案为故人档案，请由近亲属完成知情同意");
         }
         if (!userId.equals(lovedOne.getUserId())) {
@@ -61,7 +61,7 @@ public class PersonaService {
     public AiConsentResponse disable(Long userId, Long lovedOneId) {
         LovedOne lovedOne = lovedOneRepository.findById(lovedOneId)
                 .orElseThrow(() -> new BusinessException(CODE_ARCHIVE_NOT_FOUND, "档案不存在"));
-        if (lovedOne.isDeceased()) {
+        if (lovedOne.effectiveDeceased()) {
             throw new BusinessException(CODE_REQUIRE_CONSENT, "故人档案请走知情同意/关闭流程");
         }
         if (!userId.equals(lovedOne.getUserId())) {

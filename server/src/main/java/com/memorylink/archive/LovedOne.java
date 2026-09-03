@@ -43,6 +43,9 @@ public class LovedOne {
     @Column(name = "created_by")
     private Long createdBy;
 
+    @Column(name = "user_id")
+    private Long userId;
+
     @Column(name = "is_deceased", nullable = false)
     private boolean isDeceased = true;
 
@@ -146,6 +149,14 @@ public class LovedOne {
 
     public void setCreatedBy(Long createdBy) {
         this.createdBy = createdBy;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
     }
 
     public boolean isDeceased() {

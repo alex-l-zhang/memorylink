@@ -3,8 +3,13 @@ package com.memorylink.qa;
 import com.memorylink.archive.LovedOne;
 import com.memorylink.archive.LovedOneRepository;
 import com.memorylink.common.BusinessException;
+import com.memorylink.common.UserAge;
+import com.memorylink.consent.ConsentRecord;
+import com.memorylink.consent.ConsentRecordRepository;
 import com.memorylink.family.FamilyService;
 import com.memorylink.qa.dto.ChatResponse;
+import com.memorylink.user.User;
+import com.memorylink.user.UserRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -16,6 +21,8 @@ public class QaService {
 
     public static final int CODE_ARCHIVE_NOT_FOUND = 3002;
     public static final int CODE_FORBIDDEN = 4001;
+    public static final int CODE_AI_NOT_OPEN = 3006;
+    public static final int CODE_ADULT_REQUIRED = 2003;
 
     private final LovedOneRepository lovedOneRepository;
     private final FamilyService familyService;
@@ -23,24 +30,31 @@ public class QaService {
     private final DeepSeekGateway deepSeekGateway;
     private final SafetyFilter safetyFilter;
     private final ChatUsageService chatUsageService;
+    private final ConsentRecordRepository consentRecordRepository;
+    private final UserRepository userRepository;
 
     public QaService(LovedOneRepository lovedOneRepository,
                      FamilyService familyService,
                      ConversationRepository conversationRepository,
                      DeepSeekGateway deepSeekGateway,
                      SafetyFilter safetyFilter,
-                     ChatUsageService chatUsageService) {
+                     ChatUsageService chatUsageService,
+                     ConsentRecordRepository consentRecordRepository,
+                     UserRepository userRepository) {
         this.lovedOneRepository = lovedOneRepository;
         this.familyService = familyService;
         this.conversationRepository = conversationRepository;
         this.deepSeekGateway = deepSeekGateway;
         this.safetyFilter = safetyFilter;
         this.chatUsageService = chatUsageService;
+        this.consentRecordRepository = consentRecordRepository;
+        this.userRepository = userRepository;
     }
 
     @Transactional
     public ChatResponse chat(Long userId, Long lovedOneId, String question) {
         LovedOne lovedOne = requireAccess(userId, lovedOneId);
+        requireEligible(userId, lovedOne);
         Conversation conversation = new Conversation();
         conversation.setLovedOneId(lovedOneId);
         conversation.setUserId(userId);
@@ -100,6 +114,27 @@ public class QaService {
             throw new BusinessException(CODE_FORBIDDEN, "无权访问该档案");
         }
         return lovedOne;
+    }
+
+    private void requireEligible(Long userId, LovedOne lovedOne) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(CODE_ADULT_REQUIRED, "用户不存在"));
+        if (!UserAge.isAdult(user)) {
+            throw new BusinessException(CODE_ADULT_REQUIRED, "需年满 18 周岁且已完善出生日期后使用故事问答");
+        }
+        if (lovedOne.isDeceased()) {
+            boolean consented = consentRecordRepository
+                    .findFirstByLovedOneIdOrderByCreatedAtDesc(lovedOne.getId())
+                    .filter(c -> "VALID".equals(c.getStatus()))
+                    .isPresent();
+            if (!consented) {
+                throw new BusinessException(CODE_AI_NOT_OPEN,
+                        "该档案尚未完成知情同意，暂不能开启故事问答，请由近亲属提交授权");
+            }
+        } else if (!lovedOne.isAiPersonaEnabled()) {
+            throw new BusinessException(CODE_AI_NOT_OPEN,
+                    "该成员尚未开启 AI 讲述，仅本人可开启");
+        }
     }
 
     private String nullToDash(String value) {

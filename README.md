@@ -106,7 +106,8 @@ cd admin && npm install && npm run dev # 平台后台管理（默认 5174）
 ## 文档
 
 - 《忆联（MemoryLink）市场可行性报告 V1.4》
-- 《忆联（MemoryLink）产品需求说明书 V1.5》
+- 《忆联（MemoryLink）方向调整说明 V1.1》
+- 《忆联（MemoryLink）产品需求说明书 V1.7》
 - 《忆联（MemoryLink）试点项目计划 V1.4》
 - 《忆联（MemoryLink）技术架构设计书 V1.4》
 - 《忆联（MemoryLink）开发进度跟踪》（长期维护）

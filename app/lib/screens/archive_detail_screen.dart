@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 
 import '../api/api_client.dart';
@@ -275,7 +276,7 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
         : ' · ${(item.sizeBytes! / 1024).toStringAsFixed(1)}KB';
     return GestureDetector(
       onTap: item.mediaType == 'PHOTO' && item.url != null
-          ? () => _previewPhoto(item)
+          ? () => _openGallery(item)
           : null,
       child: Tooltip(
         message: item.objectKey ?? item.mediaType,
@@ -315,67 +316,211 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
     );
   }
 
-  Future<void> _previewPhoto(MediaItem item) async {
-    showDialog<void>(
+  Future<void> _openGallery(MediaItem tapped) async {
+    final photos = _media.where((m) => m.mediaType == 'PHOTO').toList();
+    if (photos.isEmpty) return;
+    final index = photos.indexWhere((m) => m.id == tapped.id);
+    if (index < 0) return;
+    await showDialog<void>(
       context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
+      builder: (_) => _PhotoGalleryDialog(
+        api: widget.api,
+        token: widget.token,
+        lovedOneId: _current.id,
+        photos: photos,
+        initialIndex: index,
+      ),
     );
-    String url;
-    try {
-      url = await widget.api.getMediaUrl(widget.token, _current.id, item.id);
-    } on ApiException catch (e) {
-      if (mounted) {
-        Navigator.of(context).pop();
-        _showSnack(e.message);
-      }
-      return;
-    } catch (_) {
-      if (mounted) {
-        Navigator.of(context).pop();
-        _showSnack('获取图片地址失败，请重试');
-      }
-      return;
-    }
-    if (!mounted) return;
-    Navigator.of(context).pop();
-    _showImagePreview(url);
+  }
+}
+
+class _PhotoGalleryDialog extends StatefulWidget {
+  final ApiClient api;
+  final String token;
+  final int lovedOneId;
+  final List<MediaItem> photos;
+  final int initialIndex;
+
+  const _PhotoGalleryDialog({
+    required this.api,
+    required this.token,
+    required this.lovedOneId,
+    required this.photos,
+    required this.initialIndex,
+  });
+
+  @override
+  State<_PhotoGalleryDialog> createState() => _PhotoGalleryDialogState();
+}
+
+class _PhotoGalleryDialogState extends State<_PhotoGalleryDialog> {
+  final Map<int, String> _urls = {};
+  late int _index;
+  String? _error;
+
+  int get _count => widget.photos.length;
+
+  MediaItem get _current => widget.photos[_index];
+
+  @override
+  void initState() {
+    super.initState();
+    _index = widget.initialIndex;
+    _loadUrl();
   }
 
-  void _showImagePreview(String url) {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => Dialog(
-        backgroundColor: Colors.black,
-        insetPadding: const EdgeInsets.all(12),
-        child: GestureDetector(
-          onTap: () => Navigator.of(dialogContext).pop(),
-          child: InteractiveViewer(
-            minScale: 0.8,
-            maxScale: 5,
-            child: SizedBox(
-              width: MediaQuery.of(dialogContext).size.width - 24,
-              height: MediaQuery.of(dialogContext).size.height * 0.8,
-              child: Image.network(
-                url,
-                fit: BoxFit.contain,
-                errorBuilder: (_, _, _) => Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.broken_image_outlined, color: Colors.white70, size: 48),
-                    const SizedBox(height: 8),
-                    const Text('图片加载失败', style: TextStyle(color: Colors.white70)),
-                    TextButton(
-                      onPressed: () => Navigator.of(dialogContext).pop(),
-                      child: const Text('关闭', style: TextStyle(color: Colors.white)),
+  Future<void> _loadUrl() async {
+    final id = _current.id;
+    if (_urls.containsKey(id)) {
+      setState(() => _error = null);
+      return;
+    }
+    setState(() => _error = null);
+    try {
+      final url = await widget.api.getMediaUrl(widget.token, widget.lovedOneId, id);
+      if (!mounted) return;
+      setState(() => _urls[id] = url);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = '获取图片地址失败，请重试');
+    }
+  }
+
+  void _move(int delta) {
+    if (_count <= 1) return;
+    final next = (_index + delta + _count) % _count;
+    if (next == _index) return;
+    setState(() {
+      _index = next;
+      _error = null;
+    });
+    _loadUrl();
+  }
+
+  void _close() {
+    Navigator.of(context).pop();
+  }
+
+  KeyEventResult _handleKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+      _move(1);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+      _move(-1);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      _close();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final url = _urls[_current.id];
+    return Dialog(
+      insetPadding: EdgeInsets.zero,
+      backgroundColor: Colors.black,
+      child: Focus(
+        autofocus: true,
+        onKeyEvent: _handleKey,
+        child: Container(
+          width: size.width,
+          height: size.height,
+          color: Colors.black,
+          child: Stack(
+            children: [
+              Center(
+                child: _error != null && url == null
+                    ? _buildError()
+                    : url == null
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : InteractiveViewer(
+                            minScale: 0.8,
+                            maxScale: 5,
+                            child: Image.network(
+                              url,
+                              fit: BoxFit.contain,
+                              width: size.width,
+                              height: size.height,
+                              errorBuilder: (_, _, _) => _buildError(),
+                            ),
+                          ),
+              ),
+              if (_count > 1) ...[
+                Positioned(
+                  left: 8,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: IconButton(
+                      tooltip: '上一张（←）',
+                      iconSize: 40,
+                      color: Colors.white,
+                      onPressed: () => _move(-1),
+                      icon: const Icon(Icons.chevron_left),
                     ),
-                  ],
+                  ),
+                ),
+                Positioned(
+                  right: 8,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: IconButton(
+                      tooltip: '下一张（→）',
+                      iconSize: 40,
+                      color: Colors.white,
+                      onPressed: () => _move(1),
+                      icon: const Icon(Icons.chevron_right),
+                    ),
+                  ),
+                ),
+              ],
+              Positioned(
+                top: 8,
+                right: 8,
+                child: IconButton(
+                  tooltip: '关闭',
+                  color: Colors.white,
+                  onPressed: _close,
+                  icon: const Icon(Icons.close),
                 ),
               ),
-            ),
+              Positioned(
+                bottom: 16,
+                left: 0,
+                right: 0,
+                child: Text(
+                  '${_index + 1} / $_count',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white70),
+                ),
+              ),
+            ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildError() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.broken_image_outlined, color: Colors.white70, size: 48),
+        const SizedBox(height: 8),
+        Text(_error ?? '图片加载失败', style: const TextStyle(color: Colors.white70)),
+        TextButton(
+          onPressed: _loadUrl,
+          child: const Text('重试', style: TextStyle(color: Colors.white)),
+        ),
+      ],
     );
   }
 }

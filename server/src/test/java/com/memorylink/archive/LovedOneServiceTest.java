@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.memorylink.archive.dto.LovedOneRequest;
@@ -125,5 +126,40 @@ class LovedOneServiceTest {
         verify(mediaStorage).put(anyString(), any(), anyLong(), anyString());
         assertThat(response.id()).isEqualTo(5L);
         assertThat(response.url()).isEqualTo("http://minio/url");
+    }
+
+    @Test
+    void deleteMediaRemovesObjectAndRecord() {
+        LovedOne lovedOne = new LovedOne();
+        lovedOne.setId(1L);
+        lovedOne.setFamilyId(9L);
+        when(lovedOneRepository.findById(1L)).thenReturn(Optional.of(lovedOne));
+        when(familyService.canAccess(1L, 9L)).thenReturn(true);
+
+        MediaFile mediaFile = new MediaFile();
+        mediaFile.setId(5L);
+        mediaFile.setLovedOneId(1L);
+        mediaFile.setObjectKey("lovedones/1/xxx.jpg");
+        when(mediaFileRepository.findByIdAndLovedOneId(5L, 1L)).thenReturn(Optional.of(mediaFile));
+
+        service.deleteMedia(1L, 1L, 5L);
+
+        verify(mediaStorage).delete("lovedones/1/xxx.jpg");
+        verify(mediaFileRepository).delete(mediaFile);
+    }
+
+    @Test
+    void deleteMediaNotFoundThrowsAndDoesNotTouchStorage() {
+        LovedOne lovedOne = new LovedOne();
+        lovedOne.setId(1L);
+        lovedOne.setFamilyId(9L);
+        when(lovedOneRepository.findById(1L)).thenReturn(Optional.of(lovedOne));
+        when(familyService.canAccess(1L, 9L)).thenReturn(true);
+        when(mediaFileRepository.findByIdAndLovedOneId(99L, 1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.deleteMedia(1L, 1L, 99L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("素材不存在");
+        verifyNoInteractions(mediaStorage);
     }
 }

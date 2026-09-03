@@ -287,26 +287,47 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
             borderRadius: BorderRadius.circular(8),
           ),
           clipBehavior: Clip.antiAlias,
-          child: Column(
+          child: Stack(
             children: [
-              SizedBox(
-                height: 80,
-                width: double.infinity,
-                child: item.mediaType == 'PHOTO' && item.url != null
-                    ? Image.network(
-                        item.url!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) =>
-                            const Icon(Icons.broken_image_outlined, size: 40),
-                      )
-                    : const Icon(Icons.graphic_eq, size: 40),
+              Column(
+                children: [
+                  SizedBox(
+                    height: 80,
+                    width: double.infinity,
+                    child: item.mediaType == 'PHOTO' && item.url != null
+                        ? Image.network(
+                            item.url!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) =>
+                                const Icon(Icons.broken_image_outlined, size: 40),
+                          )
+                        : const Icon(Icons.graphic_eq, size: 40),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Text(
+                      '${item.mediaType == 'PHOTO' ? '照片' : '录音'}$sizeLabel',
+                      style: const TextStyle(fontSize: 11),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
-              Padding(
-                padding: const EdgeInsets.all(4),
-                child: Text(
-                  '${item.mediaType == 'PHOTO' ? '照片' : '录音'}$sizeLabel',
-                  style: const TextStyle(fontSize: 11),
-                  overflow: TextOverflow.ellipsis,
+              Positioned(
+                top: 0,
+                right: 0,
+                child: IconButton(
+                  tooltip: '删除',
+                  iconSize: 16,
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(width: 26, height: 26),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.black54,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () => _deleteMedia(item),
+                  icon: const Icon(Icons.close),
                 ),
               ),
             ],
@@ -331,6 +352,34 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
         initialIndex: index,
       ),
     );
+  }
+
+  Future<void> _deleteMedia(MediaItem item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('删除素材？'),
+        content: const Text('删除后不可恢复。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await widget.api.deleteMedia(widget.token, _current.id, item.id);
+      if (!mounted) return;
+      setState(() => _media.removeWhere((m) => m.id == item.id));
+      _showSnack('已删除');
+    } on ApiException catch (e) {
+      _showSnack(e.message);
+    } catch (_) {
+      _showSnack('删除失败，请重试');
+    }
   }
 }
 

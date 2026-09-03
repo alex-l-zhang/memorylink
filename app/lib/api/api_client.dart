@@ -87,6 +87,14 @@ class ApiClient {
     return (data as Map<String, dynamic>)['url'] as String;
   }
 
+  Future<void> deleteMedia(String token, int lovedOneId, int mediaId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/api/v1/lovedones/$lovedOneId/media/$mediaId'),
+      headers: _headers(token),
+    );
+    _decode(response);
+  }
+
   Future<MediaItem> uploadMedia(
     String token,
     int lovedOneId,

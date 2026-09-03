@@ -133,6 +133,15 @@ public class LovedOneService {
         return mediaStorage.presignedGetUrl(mediaFile.getObjectKey());
     }
 
+    @Transactional
+    public void deleteMedia(Long userId, Long lovedOneId, Long mediaId) {
+        requireAccess(userId, lovedOneId);
+        MediaFile mediaFile = mediaFileRepository.findByIdAndLovedOneId(mediaId, lovedOneId)
+                .orElseThrow(() -> new BusinessException(CODE_NOT_FOUND, "素材不存在"));
+        mediaStorage.delete(mediaFile.getObjectKey());
+        mediaFileRepository.delete(mediaFile);
+    }
+
     private LovedOne requireAccess(Long userId, Long lovedOneId) {
         LovedOne lovedOne = lovedOneRepository.findById(lovedOneId)
                 .orElseThrow(() -> new BusinessException(CODE_NOT_FOUND, "档案不存在"));

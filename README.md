@@ -16,6 +16,20 @@ MemoryLink/
 
 ## 快速开始
 
+### 0. 一键启动（推荐）
+
+```bash
+scripts/start-all.sh   # 启动 Redis/MinIO + 后端 + B 端 web + 家属端 Flutter Web
+scripts/stop-all.sh    # 停止以上服务（容器数据保留）
+```
+
+启动后访问：
+
+- 家属端（C 端 Web）：http://192.168.32.128:5180
+- B 端机构后台：http://192.168.32.128:5173
+- 后端接口文档：http://192.168.32.128:8080/swagger-ui.html
+- 日志：`tail -f logs/backend.log` / `logs/app-web.log` / `logs/web.log`
+
 ### 1. 本地基础服务
 
 PostgreSQL 使用本机已安装实例（端口 5432，库 memorylink，schema memorylink，用户 memorylink/memorylink），无需启动容器。

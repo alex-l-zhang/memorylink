@@ -263,6 +263,55 @@ class ApiClient {
     return OralHistoryItem.fromJson(data as Map<String, dynamic>);
   }
 
+  Future<MySelfPerson?> getMySelfPerson(String token) async {
+    final data = await _get('/api/v1/my/self-person', token: token);
+    if (data == null) return null;
+    return MySelfPerson.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<List<MediaItem>> listMyMedia(String token) async {
+    final data = await _get('/api/v1/my/media', token: token);
+    return (data as List)
+        .map((e) => MediaItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<MediaItem> uploadMyMedia(
+    String token, {
+    required String mediaType,
+    required String filename,
+    required Uint8List bytes,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/my/media?mediaType=$mediaType');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $token'
+      ..files.add(http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+        contentType: MediaType.parse(_contentTypeFor(filename)),
+      ));
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    final data = _decode(response);
+    return MediaItem.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteMyMedia(String token, int mediaId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/api/v1/my/media/$mediaId'),
+      headers: _headers(token),
+    );
+    _decode(response);
+  }
+
+  Future<List<ConsentRecord>> listMyConsents(String token) async {
+    final data = await _get('/api/v1/my/consents', token: token);
+    return (data as List)
+        .map((e) => ConsentRecord.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<FamilyMemberInfo>> listFamilyMembers(String token, int familyId) async {
     final data = await _get('/api/v1/families/$familyId/members', token: token);
     return (data as List)

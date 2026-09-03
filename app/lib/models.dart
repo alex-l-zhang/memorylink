@@ -129,6 +129,27 @@ class OralHistoryItem {
       );
 }
 
+class MySelfPerson {
+  final int id;
+  final String name;
+  final bool isDeceased;
+  final bool aiPersonaEnabled;
+
+  MySelfPerson({
+    required this.id,
+    required this.name,
+    required this.isDeceased,
+    required this.aiPersonaEnabled,
+  });
+
+  factory MySelfPerson.fromJson(Map<String, dynamic> json) => MySelfPerson(
+        id: (json['id'] as num).toInt(),
+        name: json['name'] as String? ?? '',
+        isDeceased: json['isDeceased'] as bool? ?? false,
+        aiPersonaEnabled: json['aiPersonaEnabled'] as bool? ?? false,
+      );
+}
+
 class ChatResult {
   final int conversationId;
   final String answer;

@@ -7,6 +7,7 @@ import '../relation_options.dart';
 import 'archive_detail_screen.dart';
 import 'login_screen.dart';
 import 'my_oral_screen.dart';
+import 'my_assets_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final ApiClient api;
@@ -110,6 +111,15 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('记忆档案'),
         actions: [
+          IconButton(
+            tooltip: '我的素材与记录',
+            icon: const Icon(Icons.photo_library_outlined),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => MyAssetsScreen(api: widget.api, token: widget.token),
+              ),
+            ),
+          ),
           IconButton(
             tooltip: '我的讲述',
             icon: const Icon(Icons.record_voice_over_outlined),

@@ -162,6 +162,8 @@ public class LovedOneService {
                 lovedOne.getBio(),
                 lovedOne.getStatus(),
                 lovedOne.isDeceased(),
+                lovedOne.isAiPersonaEnabled(),
+                lovedOne.getUserId(),
                 lovedOne.getCreatedAt()
         );
     }

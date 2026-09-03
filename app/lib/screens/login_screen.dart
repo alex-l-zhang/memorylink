@@ -44,7 +44,11 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => HomeScreen(api: widget.api, token: result.token),
+          builder: (_) => HomeScreen(
+            api: widget.api,
+            token: result.token,
+            userId: result.userId,
+          ),
         ),
       );
     } on ApiException catch (e) {

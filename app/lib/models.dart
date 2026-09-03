@@ -22,6 +22,9 @@ class LovedOne {
   final String? deathDate;
   final String? birthPlace;
   final String? bio;
+  final bool isDeceased;
+  final bool aiPersonaEnabled;
+  final int? userId;
 
   LovedOne({
     required this.id,
@@ -31,6 +34,9 @@ class LovedOne {
     this.deathDate,
     this.birthPlace,
     this.bio,
+    this.isDeceased = true,
+    this.aiPersonaEnabled = false,
+    this.userId,
   });
 
   factory LovedOne.fromJson(Map<String, dynamic> json) => LovedOne(
@@ -41,6 +47,38 @@ class LovedOne {
         deathDate: json['deathDate'] as String?,
         birthPlace: json['birthPlace'] as String?,
         bio: json['bio'] as String?,
+        isDeceased: json['isDeceased'] as bool? ?? true,
+        aiPersonaEnabled: json['aiPersonaEnabled'] as bool? ?? false,
+        userId: (json['userId'] as num?)?.toInt(),
+      );
+
+  LovedOne copyWith({bool? isDeceased, bool? aiPersonaEnabled, int? userId}) => LovedOne(
+        id: id,
+        familyId: familyId,
+        name: name,
+        birthDate: birthDate,
+        deathDate: deathDate,
+        birthPlace: birthPlace,
+        bio: bio,
+        isDeceased: isDeceased ?? this.isDeceased,
+        aiPersonaEnabled: aiPersonaEnabled ?? this.aiPersonaEnabled,
+        userId: userId ?? this.userId,
+      );
+}
+
+class UserProfile {
+  final int id;
+  final String phone;
+  final String name;
+  final String? birthDate;
+
+  UserProfile({required this.id, required this.phone, required this.name, this.birthDate});
+
+  factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
+        id: (json['id'] as num).toInt(),
+        phone: json['phone'] as String? ?? '',
+        name: json['name'] as String? ?? '',
+        birthDate: json['birthDate'] as String?,
       );
 }
 

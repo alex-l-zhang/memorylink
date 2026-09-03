@@ -13,6 +13,8 @@ public record LovedOneResponse(
         String bio,
         String status,
         boolean isDeceased,
+        boolean aiPersonaEnabled,
+        Long userId,
         Instant createdAt
 ) {
 }

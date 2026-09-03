@@ -47,6 +47,7 @@ void main() {
         home: ArchiveDetailScreen(
           api: ApiClient(baseUrl: 'http://127.0.0.1:9'),
           token: 'test-token',
+          userId: 1,
           lovedOne: lovedOne,
         ),
       ),

@@ -9,8 +9,9 @@ import 'login_screen.dart';
 class HomeScreen extends StatefulWidget {
   final ApiClient api;
   final String token;
+  final int userId;
 
-  const HomeScreen({super.key, required this.api, required this.token});
+  const HomeScreen({super.key, required this.api, required this.token, required this.userId});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -18,13 +19,40 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   List<LovedOne> _lovedOnes = [];
+  UserProfile? _profile;
   bool _loading = true;
   String? _error;
+  bool _profileLoaded = false;
 
   @override
   void initState() {
     super.initState();
     _reload();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final profile = await widget.api.me(widget.token);
+      if (!mounted) return;
+      setState(() {
+        _profile = profile;
+        _profileLoaded = true;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _profileLoaded = true);
+    }
+  }
+
+  Future<void> _openProfileDialog() async {
+    final updated = await showDialog<UserProfile>(
+      context: context,
+      builder: (_) => _ProfileDialog(api: widget.api, token: widget.token, profile: _profile),
+    );
+    if (updated != null && mounted) {
+      setState(() => _profile = updated);
+      _showSnack('资料已保存');
+    }
   }
 
   Future<void> _reload() async {
@@ -81,6 +109,11 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('记忆档案'),
         actions: [
           IconButton(
+            tooltip: '我的资料',
+            icon: const Icon(Icons.person_outline),
+            onPressed: _openProfileDialog,
+          ),
+          IconButton(
             tooltip: '用邀请码加入纪念馆',
             icon: const Icon(Icons.group_add_outlined),
             onPressed: _openClaimDialog,
@@ -101,7 +134,27 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: _reload,
-        child: _buildBody(),
+        child: Column(
+          children: [
+            if (_profileLoaded && _profile?.birthDate == null) _buildProfileBanner(),
+            Expanded(child: _buildBody()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileBanner() {
+    return Card(
+      color: Theme.of(context).colorScheme.primaryContainer,
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: ListTile(
+        leading: const Icon(Icons.badge_outlined),
+        title: const Text('完善出生日期后可使用故事问答'),
+        trailing: TextButton(
+          onPressed: _openProfileDialog,
+          child: const Text('去完善'),
+        ),
       ),
     );
   }
@@ -156,6 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
           leading: const CircleAvatar(child: Icon(Icons.person)),
           title: Text(item.name),
           subtitle: Text([
+            item.isDeceased ? '故人' : '在世',
             if (item.birthDate != null) '生 ${item.birthDate}',
             if (item.deathDate != null) '卒 ${item.deathDate}',
             if (item.birthPlace != null) item.birthPlace!,
@@ -165,13 +219,112 @@ class _HomeScreenState extends State<HomeScreen> {
             await Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) =>
-                    ArchiveDetailScreen(api: widget.api, token: widget.token, lovedOne: item),
+                    ArchiveDetailScreen(
+                      api: widget.api,
+                      token: widget.token,
+                      userId: widget.userId,
+                      lovedOne: item,
+                    ),
               ),
             );
             if (mounted) _reload();
           },
         );
       },
+    );
+  }
+}
+
+class _ProfileDialog extends StatefulWidget {
+  final ApiClient api;
+  final String token;
+  final UserProfile? profile;
+
+  const _ProfileDialog({required this.api, required this.token, this.profile});
+
+  @override
+  State<_ProfileDialog> createState() => _ProfileDialogState();
+}
+
+class _ProfileDialogState extends State<_ProfileDialog> {
+  late final TextEditingController _name;
+  late final TextEditingController _birthDate;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _name = TextEditingController(text: widget.profile?.name ?? '');
+    _birthDate = TextEditingController(text: widget.profile?.birthDate ?? '');
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _birthDate.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final birthText = _birthDate.text.trim();
+    if (birthText.isNotEmpty && !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(birthText)) {
+      setState(() => _error = '出生日期格式应为 YYYY-MM-DD');
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final updated = await widget.api.updateProfile(
+        widget.token,
+        name: _name.text.trim(),
+        birthDate: birthText.isEmpty ? null : birthText,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(updated);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = '保存失败，请稍后重试');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('我的资料'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _name,
+            decoration: const InputDecoration(labelText: '姓名', border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _birthDate,
+            decoration: const InputDecoration(
+              labelText: '出生日期（YYYY-MM-DD）',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: _saving ? null : () => Navigator.pop(context), child: const Text('取消')),
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: Text(_saving ? '保存中…' : '保存'),
+        ),
+      ],
     );
   }
 }

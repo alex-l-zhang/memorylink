@@ -9,12 +9,14 @@ import 'chat_screen.dart';
 class ArchiveDetailScreen extends StatefulWidget {
   final ApiClient api;
   final String token;
+  final int userId;
   final LovedOne lovedOne;
 
   const ArchiveDetailScreen({
     super.key,
     required this.api,
     required this.token,
+    required this.userId,
     required this.lovedOne,
   });
 
@@ -258,6 +260,38 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          if (!_current.isDeceased && _current.userId == widget.userId) ...[
+            Text('AI 讲述', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Card(
+              child: ListTile(
+                leading: Icon(
+                  _current.aiPersonaEnabled ? Icons.record_voice_over : Icons.voice_over_off,
+                  color: _current.aiPersonaEnabled ? Colors.green : Colors.grey,
+                ),
+                title: Text(_current.aiPersonaEnabled ? 'AI 讲述已开启' : 'AI 讲述未开启'),
+                subtitle: Text(_current.aiPersonaEnabled
+                    ? '故事问答可用，可随时关闭'
+                    : '仅本人可开启；开启后家人可基于你的讲述向你提问'),
+                trailing: _current.aiPersonaEnabled
+                    ? OutlinedButton(
+                        onPressed: () => _toggleAi(false),
+                        child: const Text('关闭'),
+                      )
+                    : FilledButton(
+                        onPressed: () => _toggleAi(true),
+                        child: const Text('开启'),
+                      ),
+              ),
+            ),
+          ],
+          if (_current.isDeceased) ...[
+            const SizedBox(height: 16),
+            Text('故人档案', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            const Text('故事问答需完成知情同意后可用。'),
+          ],
           const SizedBox(height: 24),
           Text('素材与记录', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
@@ -350,6 +384,38 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
         lovedOneId: _current.id,
       ),
     );
+  }
+
+  Future<void> _toggleAi(bool enable) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(enable ? '开启 AI 讲述？' : '关闭 AI 讲述？'),
+        content: Text(enable
+            ? '仅本人可开启。开启后，家人可基于你的讲述/口述档案向你提问，AI 回答会带标识且仅使用你授权的内容。'
+            : '关闭后故事问答立即不可用。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(enable ? '开启' : '关闭'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      final enabled = enable
+          ? await widget.api.enableAi(widget.token, _current.id)
+          : !await widget.api.disableAi(widget.token, _current.id);
+      if (!mounted) return;
+      setState(() => _current = _current.copyWith(aiPersonaEnabled: enabled));
+      _showSnack(enable ? 'AI 讲述已开启' : 'AI 讲述已关闭');
+    } on ApiException catch (e) {
+      _showSnack(e.message);
+    } catch (_) {
+      _showSnack('操作失败，请稍后重试');
+    }
   }
 
   Widget _consentTile(ConsentRecord record) {

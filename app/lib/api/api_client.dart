@@ -143,6 +143,37 @@ class ApiClient {
     return ClaimResult.fromJson(data as Map<String, dynamic>);
   }
 
+  Future<UserProfile> me(String token) async {
+    final data = await _get('/api/v1/users/me', token: token);
+    return UserProfile.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<UserProfile> updateProfile(
+    String token, {
+    String? name,
+    String? birthDate,
+  }) async {
+    final data = await _patch('/api/v1/users/me', {
+      'name': name == null || name.isEmpty ? null : name,
+      'birthDate': birthDate == null || birthDate.isEmpty ? null : birthDate,
+    }, token: token);
+    return UserProfile.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<bool> enableAi(String token, int lovedOneId) async {
+    final data = await _post('/api/v1/lovedones/$lovedOneId/ai-consent', const {}, token: token);
+    return (data as Map<String, dynamic>)['enabled'] == true;
+  }
+
+  Future<bool> disableAi(String token, int lovedOneId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/api/v1/lovedones/$lovedOneId/ai-consent'),
+      headers: _headers(token),
+    );
+    final data = _decode(response);
+    return (data as Map<String, dynamic>)['enabled'] == false;
+  }
+
   Future<List<FamilyMemberInfo>> listFamilyMembers(String token, int familyId) async {
     final data = await _get('/api/v1/families/$familyId/members', token: token);
     return (data as List)
@@ -205,6 +236,15 @@ class ApiClient {
 
   Future<dynamic> _put(String path, Map<String, dynamic> body, {String? token}) async {
     final response = await http.put(
+      Uri.parse('$baseUrl$path'),
+      headers: _headers(token),
+      body: jsonEncode(body),
+    );
+    return _decode(response);
+  }
+
+  Future<dynamic> _patch(String path, Map<String, dynamic> body, {String? token}) async {
+    final response = await http.patch(
       Uri.parse('$baseUrl$path'),
       headers: _headers(token),
       body: jsonEncode(body),

@@ -91,3 +91,53 @@ class MediaItem {
         url: json['url'] as String?,
       );
 }
+
+class FamilyMemberInfo {
+  final int userId;
+  final String? name;
+  final String? phone;
+  final String role;
+
+  FamilyMemberInfo({
+    required this.userId,
+    this.name,
+    this.phone,
+    required this.role,
+  });
+
+  factory FamilyMemberInfo.fromJson(Map<String, dynamic> json) => FamilyMemberInfo(
+        userId: (json['userId'] as num).toInt(),
+        name: json['name'] as String?,
+        phone: json['phone'] as String?,
+        role: json['role'] as String? ?? '',
+      );
+}
+
+class ConsentRecord {
+  final int id;
+  final int lovedOneId;
+  final String consentType;
+  final List<int> consentorIds;
+  final String? signedAt;
+  final String status;
+
+  ConsentRecord({
+    required this.id,
+    required this.lovedOneId,
+    required this.consentType,
+    required this.consentorIds,
+    this.signedAt,
+    required this.status,
+  });
+
+  factory ConsentRecord.fromJson(Map<String, dynamic> json) => ConsentRecord(
+        id: (json['id'] as num).toInt(),
+        lovedOneId: (json['lovedOneId'] as num).toInt(),
+        consentType: json['consentType'] as String? ?? '',
+        consentorIds: (json['consentorIds'] as List? ?? const [])
+            .map((e) => (e as num).toInt())
+            .toList(),
+        signedAt: json['signedAt'] as String?,
+        status: json['status'] as String? ?? '',
+      );
+}

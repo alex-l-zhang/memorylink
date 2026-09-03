@@ -95,6 +95,20 @@ class ApiClient {
     _decode(response);
   }
 
+  Future<List<ConsentRecord>> listConsents(String token, int lovedOneId) async {
+    final data = await _get('/api/v1/lovedones/$lovedOneId/consents', token: token);
+    return (data as List)
+        .map((e) => ConsentRecord.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<FamilyMemberInfo>> listFamilyMembers(String token, int familyId) async {
+    final data = await _get('/api/v1/families/$familyId/members', token: token);
+    return (data as List)
+        .map((e) => FamilyMemberInfo.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<MediaItem> uploadMedia(
     String token,
     int lovedOneId,

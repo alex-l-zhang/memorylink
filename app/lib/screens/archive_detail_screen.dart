@@ -35,6 +35,10 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
   String? _error;
   String? _mediaError;
   List<MediaItem> _media = [];
+  List<ConsentRecord> _consents = [];
+  List<FamilyMemberInfo> _members = [];
+  bool _consentsLoading = true;
+  String? _consentsError;
 
   @override
   void initState() {
@@ -46,6 +50,7 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
     _birthPlace = TextEditingController(text: _current.birthPlace ?? '');
     _bio = TextEditingController(text: _current.bio ?? '');
     _loadMedia();
+    _loadConsents();
   }
 
   @override
@@ -108,6 +113,29 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
       setState(() => _media = media);
     } catch (_) {
       if (mounted) setState(() => _mediaError = '素材加载失败，请稍后重试');
+    }
+  }
+
+  Future<void> _loadConsents() async {
+    try {
+      final results = await Future.wait([
+        widget.api.listConsents(widget.token, _current.id),
+        widget.api.listFamilyMembers(widget.token, _current.familyId),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _consents = results[0] as List<ConsentRecord>;
+        _members = results[1] as List<FamilyMemberInfo>;
+        _consentsLoading = false;
+        _consentsError = null;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _consentsLoading = false;
+          _consentsError = '知情同意记录加载失败';
+        });
+      }
     }
   }
 
@@ -259,15 +287,57 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
               children: _media.map(_mediaCard).toList(),
             ),
           const SizedBox(height: 16),
-          const ListTile(
-            leading: Icon(Icons.verified_user_outlined),
-            title: Text('知情同意记录'),
-            subtitle: Text('即将支持'),
-            enabled: false,
-          ),
+          Text('知情同意', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          if (_consentsLoading)
+            const LinearProgressIndicator()
+          else if (_consentsError != null)
+            Text(_consentsError!, style: TextStyle(color: Theme.of(context).colorScheme.error))
+          else if (_consents.isEmpty)
+            const Text('尚未提交知情同意记录，创建档案时由家人完成确认。')
+          else
+            ..._consents.map(_consentTile),
         ],
       ),
     );
+  }
+
+  Widget _consentTile(ConsentRecord record) {
+    final names = record.consentorIds
+        .map((id) => _members
+                .where((m) => m.userId == id)
+                .map((m) => m.name ?? m.phone ?? '#$id')
+                .firstOrNull ??
+            '#$id')
+        .join('、');
+    final typeLabel = record.consentType == 'PRE_AUTHORIZED' ? '故人生前预授权' : '两名近亲共同确认';
+    final valid = record.status == 'VALID';
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: ListTile(
+        leading: Icon(
+          valid ? Icons.verified_user : Icons.pending_outlined,
+          color: valid ? Colors.green : Colors.orange,
+        ),
+        title: Text(typeLabel),
+        subtitle: Text('确认人：$names\n签署时间：${_formatTime(record.signedAt)}'),
+        trailing: Text(
+          valid ? '有效' : record.status,
+          style: TextStyle(
+            color: valid ? Colors.green : Colors.orange,
+            fontSize: 12,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatTime(String? iso) {
+    if (iso == null || iso.isEmpty) return '-';
+    final time = DateTime.tryParse(iso)?.toLocal();
+    if (time == null) return iso;
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${time.year}-${two(time.month)}-${two(time.day)} ${two(time.hour)}:${two(time.minute)}';
   }
 
   Widget _mediaCard(MediaItem item) {

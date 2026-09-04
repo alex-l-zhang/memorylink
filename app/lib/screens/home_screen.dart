@@ -461,7 +461,7 @@ class _ProfileDialogState extends State<_ProfileDialog> {
       password.dispose();
       await SessionStore.clear();
       if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
+      Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => LoginScreen(api: widget.api)),
         (route) => false,
       );

@@ -42,6 +42,13 @@ class _HomeScreenState extends State<HomeScreen> {
         _profile = profile;
         _profileLoaded = true;
       });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      if (e.code == 1001 || e.code == 1002) {
+        await _gotoLogin();
+        return;
+      }
+      if (mounted) setState(() => _profileLoaded = true);
     } catch (_) {
       if (mounted) setState(() => _profileLoaded = true);
     }
@@ -68,7 +75,12 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       setState(() => _lovedOnes = list);
     } on ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      if (!mounted) return;
+      if (e.code == 1001 || e.code == 1002) {
+        await _gotoLogin();
+        return;
+      }
+      setState(() => _error = e.message);
     } catch (_) {
       if (mounted) setState(() => _error = '加载失败，请确认后端服务已启动');
     } finally {
@@ -194,13 +206,15 @@ class _HomeScreenState extends State<HomeScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _logout() async {
+  Future<void> _gotoLogin() async {
     await SessionStore.clear();
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => LoginScreen(api: widget.api)),
     );
   }
+
+  Future<void> _logout() => _gotoLogin();
 
   Widget _buildBody() {
     if (_loading) {

@@ -391,6 +391,12 @@ class ApiClient {
   }
 
   dynamic _decode(http.Response response) {
+    if (response.statusCode == 401) {
+      throw ApiException(1001, '登录已过期，请重新登录');
+    }
+    if (response.statusCode == 403) {
+      throw ApiException(4001, '无权访问');
+    }
     final map = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
     final code = map['code'] as int? ?? 5000;
     if (code != 0) {

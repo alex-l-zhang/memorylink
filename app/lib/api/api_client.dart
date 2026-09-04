@@ -314,6 +314,28 @@ class ApiClient {
         .toList();
   }
 
+  Future<void> logout(String token) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/v1/auth/logout'),
+      headers: _headers(token),
+    );
+    _decode(response);
+  }
+
+  Future<DeletionPreview> deletionPreview(String token) async {
+    final data = await _get('/api/v1/users/me/deletion-preview', token: token);
+    return DeletionPreview.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteAccount(String token, String password) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/api/v1/users/me'),
+      headers: _headers(token),
+      body: jsonEncode({'password': password, 'confirm': true}),
+    );
+    _decode(response);
+  }
+
   Future<List<FamilyMemberInfo>> listFamilyMembers(String token, int familyId) async {
     final data = await _get('/api/v1/families/$familyId/members', token: token);
     return (data as List)

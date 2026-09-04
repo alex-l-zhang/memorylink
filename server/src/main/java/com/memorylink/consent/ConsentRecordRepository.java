@@ -16,4 +16,6 @@ public interface ConsentRecordRepository extends JpaRepository<ConsentRecord, Lo
             + "WHERE consentor_ids @> CAST(CONCAT('[', CAST(:userId AS text), ']') AS jsonb) "
             + "ORDER BY created_at DESC", nativeQuery = true)
     List<ConsentRecord> findByConsentorContaining(@Param("userId") Long userId);
+
+    List<ConsentRecord> findByLovedOneIdIn(java.util.Collection<Long> lovedOneIds);
 }

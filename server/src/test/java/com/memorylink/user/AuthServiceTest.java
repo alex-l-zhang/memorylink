@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 
 import com.memorylink.common.BusinessException;
 import com.memorylink.config.JwtService;
+import com.memorylink.audit.AuditService;
 import com.memorylink.user.dto.AuthResponse;
 import com.memorylink.user.dto.LoginRequest;
 import com.memorylink.user.dto.RegisterRequest;
@@ -23,6 +24,8 @@ class AuthServiceTest {
 
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private AuditService auditService;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
     private final JwtService jwtService = new JwtService("please-change-me-in-production-0123456789abcdef", 7200);
@@ -30,7 +33,7 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
-        authService = new AuthService(userRepository, passwordEncoder, jwtService);
+        authService = new AuthService(userRepository, passwordEncoder, jwtService, auditService);
     }
 
     @Test

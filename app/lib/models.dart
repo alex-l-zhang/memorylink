@@ -150,6 +150,33 @@ class MySelfPerson {
       );
 }
 
+class DeletionPreview {
+  final int ownedFamilies;
+  final int memberLinks;
+  final int selfProfiles;
+  final int myMedia;
+  final int myOralHistories;
+  final int myConversations;
+
+  DeletionPreview({
+    required this.ownedFamilies,
+    required this.memberLinks,
+    required this.selfProfiles,
+    required this.myMedia,
+    required this.myOralHistories,
+    required this.myConversations,
+  });
+
+  factory DeletionPreview.fromJson(Map<String, dynamic> json) => DeletionPreview(
+        ownedFamilies: (json['ownedFamilies'] as num?)?.toInt() ?? 0,
+        memberLinks: (json['memberLinks'] as num?)?.toInt() ?? 0,
+        selfProfiles: (json['selfProfiles'] as num?)?.toInt() ?? 0,
+        myMedia: (json['myMedia'] as num?)?.toInt() ?? 0,
+        myOralHistories: (json['myOralHistories'] as num?)?.toInt() ?? 0,
+        myConversations: (json['myConversations'] as num?)?.toInt() ?? 0,
+      );
+}
+
 class ChatResult {
   final int conversationId;
   final String answer;

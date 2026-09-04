@@ -214,7 +214,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _logout() => _gotoLogin();
+  Future<void> _logout() async {
+    try {
+      await widget.api.logout(widget.token);
+    } catch (_) {
+      // 审计失败不影响本地退出
+    }
+    await _gotoLogin();
+  }
 
   Widget _buildBody() {
     if (_loading) {
@@ -359,14 +366,117 @@ class _ProfileDialogState extends State<_ProfileDialog> {
           ],
         ],
       ),
+      actionsAlignment: MainAxisAlignment.spaceBetween,
       actions: [
-        TextButton(onPressed: _saving ? null : () => Navigator.pop(context), child: const Text('取消')),
-        FilledButton(
-          onPressed: _saving ? null : _save,
-          child: Text(_saving ? '保存中…' : '保存'),
+        TextButton.icon(
+          onPressed: _saving ? null : _deleteAccountFlow,
+          icon: const Icon(Icons.delete_forever_outlined, size: 18),
+          label: const Text('注销账号'),
+          style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextButton(
+              onPressed: _saving ? null : () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: _saving ? null : _save,
+              child: Text(_saving ? '保存中…' : '保存'),
+            ),
+          ],
         ),
       ],
     );
+  }
+
+  Future<void> _deleteAccountFlow() async {
+    DeletionPreview preview;
+    try {
+      preview = await widget.api.deletionPreview(widget.token);
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+      return;
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('获取注销信息失败，请稍后重试')));
+      }
+      return;
+    }
+    if (!mounted) return;
+    final password = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('注销账号'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('注销后以下信息将被物理删除，且不可恢复：',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text('· 本人基础信息（姓名、手机号、登录密码）'),
+              if (preview.selfProfiles > 0) Text('· 本人档案 ${preview.selfProfiles} 个'),
+              if (preview.ownedFamilies > 0) Text('· 我创建且无其他成员的家族 ${preview.ownedFamilies} 个'),
+              Text('· 家族成员关联 ${preview.memberLinks} 条'),
+              if (preview.myMedia > 0) Text('· 我上传的照片/录音/视频 ${preview.myMedia} 个'),
+              if (preview.myOralHistories > 0) Text('· 口述历史 ${preview.myOralHistories} 条'),
+              if (preview.myConversations > 0) Text('· 故事问答记录 ${preview.myConversations} 条'),
+              const SizedBox(height: 8),
+              const Text('保留说明：有其他成员的家族共有内容将保留；我参与的授权记录将作为家族证据保留。'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: password,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: '输入密码确认', border: OutlineInputBorder()),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(dialogContext).colorScheme.error),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('确认注销'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) {
+      password.dispose();
+      return;
+    }
+    try {
+      await widget.api.deleteAccount(widget.token, password.text);
+      password.dispose();
+      await SessionStore.clear();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => LoginScreen(api: widget.api)),
+        (route) => false,
+      );
+    } on ApiException catch (e) {
+      password.dispose();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } catch (_) {
+      password.dispose();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('注销失败，请稍后重试')));
+      }
+    }
   }
 }
 

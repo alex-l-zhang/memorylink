@@ -2,12 +2,14 @@ package com.memorylink.user;
 
 import com.memorylink.common.BusinessException;
 import com.memorylink.config.JwtService;
+import com.memorylink.audit.AuditService;
 import com.memorylink.user.dto.AuthResponse;
 import com.memorylink.user.dto.LoginRequest;
 import com.memorylink.user.dto.RegisterRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.Map;
 
 @Service
 public class AuthService {
@@ -19,11 +21,14 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final AuditService auditService;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
+                       JwtService jwtService, AuditService auditService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.auditService = auditService;
     }
 
     @Transactional
@@ -51,6 +56,15 @@ public class AuthService {
                 .filter(u -> passwordEncoder.matches(request.password(), u.getPasswordHash()))
                 .orElseThrow(() -> new BusinessException(CODE_BAD_CREDENTIALS, "手机号或密码错误"));
         String token = jwtService.generateToken(user.getId(), user.getPhone(), user.getRole());
+        auditService.log("USER", user.getId(), "LOGIN", "user:" + user.getId(),
+                Map.of("phone", mask(user.getPhone())));
         return new AuthResponse(token, user.getId(), user.getPhone(), user.getName());
+    }
+
+    private String mask(String phone) {
+        if (phone == null || phone.length() < 7) {
+            return "***";
+        }
+        return phone.substring(0, 3) + "****" + phone.substring(phone.length() - 4);
     }
 }

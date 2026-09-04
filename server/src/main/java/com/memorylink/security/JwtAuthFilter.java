@@ -1,6 +1,7 @@
 package com.memorylink.security;
 
 import com.memorylink.config.JwtService;
+import com.memorylink.user.UserRepository;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -18,9 +19,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final UserRepository userRepository;
 
-    public JwtAuthFilter(JwtService jwtService) {
+    public JwtAuthFilter(JwtService jwtService, UserRepository userRepository) {
         this.jwtService = jwtService;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -33,7 +36,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 String phone = claims.getSubject();
                 Number uid = claims.get("uid", Number.class);
                 String role = claims.get("role", String.class);
-                if (phone != null && uid != null) {
+                if (phone != null && uid != null && userRepository.existsById(uid.longValue())) {
                     UserPrincipal principal = new UserPrincipal(uid.longValue(), phone, role);
                     var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + (role == null ? "USER" : role)));
                     var authentication = new UsernamePasswordAuthenticationToken(principal, null, authorities);

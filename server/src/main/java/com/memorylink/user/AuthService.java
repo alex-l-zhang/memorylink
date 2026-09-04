@@ -14,6 +14,7 @@ public class AuthService {
 
     public static final int CODE_PHONE_EXISTS = 3001;
     public static final int CODE_BAD_CREDENTIALS = 1003;
+    public static final int CODE_PASSWORD_MISMATCH = 2002;
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -27,6 +28,9 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
+        if (!request.password().equals(request.confirmPassword())) {
+            throw new BusinessException(CODE_PASSWORD_MISMATCH, "两次输入的密码不一致");
+        }
         if (userRepository.existsByPhone(request.phone())) {
             throw new BusinessException(CODE_PHONE_EXISTS, "该手机号已注册");
         }

@@ -37,7 +37,8 @@ class AuthServiceTest {
     void registerDuplicatedPhoneFails() {
         when(userRepository.existsByPhone("13800138000")).thenReturn(true);
 
-        assertThatThrownBy(() -> authService.register(new RegisterRequest("13800138000", "小明", "secret123")))
+        assertThatThrownBy(() -> authService.register(
+                new RegisterRequest("13800138000", "小明", "secret123", "secret123")))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("已注册");
     }
@@ -52,11 +53,20 @@ class AuthServiceTest {
         saved.setRole("USER");
         when(userRepository.save(any(User.class))).thenReturn(saved);
 
-        AuthResponse response = authService.register(new RegisterRequest("13800138000", "小明", "secret123"));
+        AuthResponse response = authService.register(
+                new RegisterRequest("13800138000", "小明", "secret123", "secret123"));
 
         assertThat(response.token()).isNotBlank();
         assertThat(response.userId()).isEqualTo(1L);
         assertThat(response.phone()).isEqualTo("13800138000");
+    }
+
+    @Test
+    void registerRejectsMismatchedPasswords() {
+        assertThatThrownBy(() -> authService.register(
+                new RegisterRequest("13800138000", "小明", "secret123", "different")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("密码不一致");
     }
 
     @Test

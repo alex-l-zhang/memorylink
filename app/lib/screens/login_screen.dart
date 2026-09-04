@@ -16,6 +16,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _phone = TextEditingController();
   final _password = TextEditingController();
+  final _confirmPassword = TextEditingController();
   final _name = TextEditingController();
   bool _registerMode = false;
   bool _loading = false;
@@ -25,11 +26,16 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _phone.dispose();
     _password.dispose();
+    _confirmPassword.dispose();
     _name.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
+    if (_registerMode && _password.text != _confirmPassword.text) {
+      setState(() => _error = '两次输入的密码不一致');
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -40,6 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
               phone: _phone.text.trim(),
               name: _name.text.trim(),
               password: _password.text,
+              confirmPassword: _confirmPassword.text,
             )
           : await widget.api.login(phone: _phone.text.trim(), password: _password.text);
       await SessionStore.save(AuthSession(
@@ -99,6 +106,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   obscureText: true,
                   decoration: const InputDecoration(labelText: '密码', border: OutlineInputBorder()),
                 ),
+                if (_registerMode) ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _confirmPassword,
+                    obscureText: true,
+                    decoration: const InputDecoration(labelText: '确认密码', border: OutlineInputBorder()),
+                  ),
+                ],
                 if (_error != null) ...[
                   const SizedBox(height: 12),
                   Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),

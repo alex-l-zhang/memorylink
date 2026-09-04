@@ -30,11 +30,13 @@ class ApiClient {
     required String phone,
     required String name,
     required String password,
+    required String confirmPassword,
   }) async {
     final data = await _post('/api/v1/auth/register', {
       'phone': phone,
       'name': name,
       'password': password,
+      'confirmPassword': confirmPassword,
     });
     return AuthResult.fromJson(data as Map<String, dynamic>);
   }

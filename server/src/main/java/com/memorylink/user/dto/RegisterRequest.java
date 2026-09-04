@@ -15,6 +15,9 @@ public record RegisterRequest(
 
         @NotBlank(message = "密码不能为空")
         @Size(min = 6, max = 32, message = "密码长度需在 6-32 位")
-        String password
+        String password,
+
+        @NotBlank(message = "请再次输入密码")
+        String confirmPassword
 ) {
 }

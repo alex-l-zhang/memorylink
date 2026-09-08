@@ -177,6 +177,33 @@ class DeletionPreview {
       );
 }
 
+class InviteInfo {
+  final int lovedOneId;
+  final String? inviterName;
+  final String? inviterPhone;
+  final String? targetName;
+  final String role;
+  final String? expiresAt;
+
+  InviteInfo({
+    required this.lovedOneId,
+    this.inviterName,
+    this.inviterPhone,
+    this.targetName,
+    required this.role,
+    this.expiresAt,
+  });
+
+  factory InviteInfo.fromJson(Map<String, dynamic> json) => InviteInfo(
+        lovedOneId: (json['lovedOneId'] as num).toInt(),
+        inviterName: json['inviterName'] as String?,
+        inviterPhone: json['inviterPhone'] as String?,
+        targetName: json['targetName'] as String?,
+        role: json['role'] as String? ?? 'VIEWER',
+        expiresAt: json['expiresAt'] as String?,
+      );
+}
+
 class ChatResult {
   final int conversationId;
   final String answer;

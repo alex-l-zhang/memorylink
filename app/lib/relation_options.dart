@@ -10,5 +10,6 @@ const List<RelationOption> relationOptions = [
   RelationOption('CHILD', '子女'),
   RelationOption('GRANDCHILD', '孙辈'),
   RelationOption('SIBLING', '兄弟姐妹'),
+  RelationOption('FRIEND', '朋友'),
   RelationOption('OTHER', '其他'),
 ];

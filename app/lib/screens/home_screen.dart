@@ -494,6 +494,8 @@ class _ClaimDialogState extends State<_ClaimDialog> {
   final _code = TextEditingController();
   String _relation = 'CHILD';
   bool _submitting = false;
+  bool _querying = false;
+  InviteInfo? _info;
   String? _error;
 
   @override
@@ -524,6 +526,48 @@ class _ClaimDialogState extends State<_ClaimDialog> {
     }
   }
 
+  Future<void> _query() async {
+    final code = _code.text.trim();
+    if (code.isEmpty) {
+      setState(() => _error = '请输入邀请码');
+      return;
+    }
+    setState(() {
+      _querying = true;
+      _error = null;
+    });
+    try {
+      final info = await widget.api.inviteInfo(widget.token, code);
+      if (!mounted) return;
+      setState(() {
+        _info = info;
+        _querying = false;
+      });
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _querying = false;
+          _error = e.message;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _querying = false;
+          _error = '查询失败，请稍后重试';
+        });
+      }
+    }
+  }
+
+  String _fmtExpiry(String? iso) {
+    if (iso == null || iso.isEmpty) return '有效期未知';
+    final t = DateTime.tryParse(iso)?.toLocal();
+    if (t == null) return iso;
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '有效期至 ${t.year}-${two(t.month)}-${two(t.day)} ${two(t.hour)}:${two(t.minute)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -540,16 +584,40 @@ class _ClaimDialogState extends State<_ClaimDialog> {
             ),
           ),
           const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            initialValue: _relation,
-            decoration: const InputDecoration(labelText: '你与故人的关系', border: OutlineInputBorder()),
-            items: relationOptions
-                .map((o) => DropdownMenuItem(value: o.code, child: Text(o.label)))
-                .toList(),
-            onChanged: (value) {
-              if (value != null) setState(() => _relation = value);
-            },
-          ),
+          if (_info == null)
+            const Text('输入邀请码后，先确认邀请人与加入对象，再选择与邀请人的关系。')
+          else ...[
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('邀请人：${_info!.inviterName ?? '未知'}（${_info!.inviterPhone ?? '-'}）',
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text('邀请加入：${_info!.targetName ?? '家族'} 的家族纪念馆'),
+                    Text('权限：${_info!.role == 'EDITOR' ? '共建' : '只读'} · ${_fmtExpiry(_info!.expiresAt)}'),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _relation,
+              decoration: const InputDecoration(labelText: '你与邀请人的关系', border: OutlineInputBorder()),
+              items: relationOptions
+                  .map((o) => DropdownMenuItem(value: o.code, child: Text(o.label)))
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) setState(() => _relation = value);
+              },
+            ),
+          ],
+          if (_querying) ...[
+            const SizedBox(height: 12),
+            const LinearProgressIndicator(),
+          ],
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
@@ -562,8 +630,18 @@ class _ClaimDialogState extends State<_ClaimDialog> {
           child: const Text('取消'),
         ),
         FilledButton(
-          onPressed: _submitting ? null : _submit,
-          child: Text(_submitting ? '加入中…' : '加入'),
+          onPressed: _submitting || _querying
+              ? null
+              : _info == null
+                  ? _query
+                  : _submit,
+          child: Text(_querying
+              ? '查询中…'
+              : _submitting
+                  ? '加入中…'
+                  : _info == null
+                      ? '查询邀请信息'
+                      : '确认加入'),
         ),
       ],
     );

@@ -10,6 +10,8 @@ import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -36,5 +38,11 @@ public class InviteController {
     public ApiResponse<ClaimResponse> claim(@Valid @RequestBody ClaimRequest request) {
         return ApiResponse.ok(inviteService.claim(
                 SecurityUtils.currentUser().userId(), request.code(), request.relation()));
+    }
+
+    @GetMapping("/invites/info")
+    public ApiResponse<com.memorylink.invite.dto.InviteInfoResponse> info(
+            @RequestParam("code") String code) {
+        return ApiResponse.ok(inviteService.info(code));
     }
 }

@@ -10,6 +10,8 @@ import static org.mockito.Mockito.when;
 import com.memorylink.archive.LovedOne;
 import com.memorylink.archive.LovedOneRepository;
 import com.memorylink.audit.AuditLogRepository;
+import com.memorylink.user.User;
+import com.memorylink.user.UserRepository;
 import com.memorylink.common.BusinessException;
 import com.memorylink.family.FamilyMember;
 import com.memorylink.family.FamilyMemberRepository;
@@ -38,19 +40,22 @@ class InviteServiceTest {
     private FamilyMemberRepository familyMemberRepository;
     @Mock
     private AuditLogRepository auditLogRepository;
+    @Mock
+    private UserRepository userRepository;
 
     private InviteService service;
 
     @BeforeEach
     void setUp() {
         service = new InviteService(inviteKeyRepository, lovedOneRepository,
-                familyService, familyMemberRepository, auditLogRepository);
+                familyService, familyMemberRepository, auditLogRepository, userRepository);
     }
 
     private LovedOne lovedOne(Long familyId) {
         LovedOne lovedOne = new LovedOne();
         lovedOne.setId(1L);
         lovedOne.setFamilyId(familyId);
+        lovedOne.setName("张爷爷");
         return lovedOne;
     }
 
@@ -58,6 +63,7 @@ class InviteServiceTest {
         InviteKey key = new InviteKey();
         key.setId(3L);
         key.setLovedOneId(1L);
+        key.setCreatedBy(1L);
         key.setCodeHash("abc");
         key.setRole("VIEWER");
         key.setExpiresAt(expiresAt);
@@ -127,5 +133,23 @@ class InviteServiceTest {
         assertThatThrownBy(() -> service.claim(7L, "ABCD-EFGH-JKLM-NPQR", "CHILD"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("无效或已过期");
+    }
+
+    @Test
+    void infoReturnsInviterAndTarget() {
+        InviteKey key = activeKey(Instant.now().plusSeconds(3600));
+        when(inviteKeyRepository.findFirstByCodeHashOrderByIdDesc(anyString())).thenReturn(Optional.of(key));
+        User inviter = new User();
+        inviter.setId(1L);
+        inviter.setName("李建国");
+        inviter.setPhone("13800138001");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(inviter));
+        when(lovedOneRepository.findById(1L)).thenReturn(Optional.of(lovedOne(9L)));
+
+        var response = service.info("ABCD-EFGH-JKLM-NPQR");
+
+        assertThat(response.inviterName()).isEqualTo("李建国");
+        assertThat(response.inviterPhone()).isEqualTo("138****8001");
+        assertThat(response.targetName()).isEqualTo("张爷爷");
     }
 }

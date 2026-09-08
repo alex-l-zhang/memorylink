@@ -145,6 +145,14 @@ class ApiClient {
     return ClaimResult.fromJson(data as Map<String, dynamic>);
   }
 
+  Future<InviteInfo> inviteInfo(String token, String code) async {
+    final data = await _get(
+      '/api/v1/invites/info?code=${Uri.encodeQueryComponent(code)}',
+      token: token,
+    );
+    return InviteInfo.fromJson(data as Map<String, dynamic>);
+  }
+
   Future<UserProfile> me(String token) async {
     final data = await _get('/api/v1/users/me', token: token);
     return UserProfile.fromJson(data as Map<String, dynamic>);

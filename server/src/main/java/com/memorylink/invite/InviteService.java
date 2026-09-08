@@ -10,6 +10,7 @@ import com.memorylink.family.FamilyMemberRepository;
 import com.memorylink.family.FamilyService;
 import com.memorylink.invite.dto.ClaimResponse;
 import com.memorylink.invite.dto.InviteKeyResponse;
+import com.memorylink.invite.dto.InviteInfoResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
@@ -31,7 +32,10 @@ public class InviteService {
 
     private static final String CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final Set<String> ROLES = Set.of("VIEWER", "EDITOR");
-    private static final Set<String> RELATIONS = Set.of("SPOUSE", "CHILD", "GRANDCHILD", "SIBLING", "OTHER");
+    private static final Set<String> RELATIONS =
+            Set.of("SPOUSE", "CHILD", "GRANDCHILD", "SIBLING", "FRIEND", "OTHER");
+
+    private final com.memorylink.user.UserRepository userRepository;
 
     private final InviteKeyRepository inviteKeyRepository;
     private final LovedOneRepository lovedOneRepository;
@@ -44,12 +48,14 @@ public class InviteService {
                          LovedOneRepository lovedOneRepository,
                          FamilyService familyService,
                          FamilyMemberRepository familyMemberRepository,
-                         AuditLogRepository auditLogRepository) {
+                         AuditLogRepository auditLogRepository,
+                         com.memorylink.user.UserRepository userRepository) {
         this.inviteKeyRepository = inviteKeyRepository;
         this.lovedOneRepository = lovedOneRepository;
         this.familyService = familyService;
         this.familyMemberRepository = familyMemberRepository;
         this.auditLogRepository = auditLogRepository;
+        this.userRepository = userRepository;
     }
 
     @Transactional
@@ -95,7 +101,7 @@ public class InviteService {
         }
         String targetRelation = relation == null ? "" : relation.trim().toUpperCase();
         if (!RELATIONS.contains(targetRelation)) {
-            throw new BusinessException(CODE_INVALID, "关系仅支持 SPOUSE/CHILD/GRANDCHILD/SIBLING/OTHER");
+            throw new BusinessException(CODE_INVALID, "关系仅支持 SPOUSE/CHILD/GRANDCHILD/SIBLING/FRIEND/OTHER");
         }
         LovedOne lovedOne = lovedOneRepository.findById(key.getLovedOneId())
                 .orElseThrow(() -> new BusinessException(CODE_ARCHIVE_NOT_FOUND, "档案不存在"));
@@ -124,6 +130,30 @@ public class InviteService {
         return new ClaimResponse(lovedOne.getFamilyId(), member.getRole(), targetRelation, "已通过邀请码加入纪念馆");
     }
 
+    @Transactional(readOnly = true)
+    public InviteInfoResponse info(String code) {
+        String normalized = normalize(code);
+        InviteKey key = inviteKeyRepository.findFirstByCodeHashOrderByIdDesc(sha256Hex(normalized))
+                .orElseThrow(() -> new BusinessException(CODE_KEY_INVALID, "邀请码无效或已过期"));
+        if (!"ACTIVE".equals(key.getStatus())
+                || key.getExpiresAt().isBefore(Instant.now())
+                || key.getUsedCount() >= key.getMaxUses()) {
+            throw new BusinessException(CODE_KEY_INVALID, "邀请码无效或已过期");
+        }
+        var inviter = userRepository.findById(key.getCreatedBy())
+                .orElseThrow(() -> new BusinessException(CODE_KEY_INVALID, "邀请码无效或已过期"));
+        var lovedOne = lovedOneRepository.findById(key.getLovedOneId())
+                .orElseThrow(() -> new BusinessException(CODE_ARCHIVE_NOT_FOUND, "档案不存在"));
+        return new InviteInfoResponse(
+                lovedOne.getId(),
+                inviter.getName(),
+                maskPhone(inviter.getPhone()),
+                lovedOne.getName(),
+                key.getRole(),
+                key.getExpiresAt()
+        );
+    }
+
     private void audit(String actorType, Long actorId, String action, String target, Map<String, Object> detail) {
         AuditLog log = new AuditLog();
         log.setActorType(actorType);
@@ -150,6 +180,13 @@ public class InviteService {
 
     private String normalize(String code) {
         return code == null ? "" : code.replaceAll("[^A-Za-z0-9]", "").toUpperCase();
+    }
+
+    private String maskPhone(String phone) {
+        if (phone == null || phone.length() < 7) {
+            return "***";
+        }
+        return phone.substring(0, 3) + "****" + phone.substring(phone.length() - 4);
     }
 
     private String sha256Hex(String value) {

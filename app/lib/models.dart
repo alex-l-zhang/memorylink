@@ -204,6 +204,60 @@ class InviteInfo {
       );
 }
 
+class UserCandidate {
+  final int id;
+  final String name;
+  final int? birthYear;
+  final int? birthMonth;
+  final String? birthPlace;
+
+  UserCandidate({
+    required this.id,
+    required this.name,
+    this.birthYear,
+    this.birthMonth,
+    this.birthPlace,
+  });
+
+  factory UserCandidate.fromJson(Map<String, dynamic> json) => UserCandidate(
+        id: (json['id'] as num).toInt(),
+        name: json['name'] as String? ?? '',
+        birthYear: (json['birthYear'] as num?)?.toInt(),
+        birthMonth: (json['birthMonth'] as num?)?.toInt(),
+        birthPlace: json['birthPlace'] as String?,
+      );
+}
+
+class ConnectionRequestItem {
+  final int id;
+  final String requesterName;
+  final int? birthYear;
+  final int? birthMonth;
+  final String? birthPlace;
+  final String relation;
+  final String status;
+
+  ConnectionRequestItem({
+    required this.id,
+    required this.requesterName,
+    this.birthYear,
+    this.birthMonth,
+    this.birthPlace,
+    required this.relation,
+    required this.status,
+  });
+
+  factory ConnectionRequestItem.fromJson(Map<String, dynamic> json) => ConnectionRequestItem(
+        id: (json['id'] as num).toInt(),
+        requesterName: json['requesterName'] as String? ?? '',
+        birthYear: (json['birthYear'] as num?)?.toInt(),
+        birthMonth: (json['birthMonth'] as num?)?.toInt(),
+        birthPlace: json['birthPlace'] as String?,
+        relation: json['relation'] as String? ?? '',
+        status: json['status'] as String? ?? '',
+      );
+}
+
 class ChatResult {
   final int conversationId;
   final String answer;

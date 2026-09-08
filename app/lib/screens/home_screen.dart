@@ -8,6 +8,7 @@ import 'archive_detail_screen.dart';
 import 'login_screen.dart';
 import 'my_oral_screen.dart';
 import 'my_assets_screen.dart';
+import 'connections_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final ApiClient api;
@@ -129,6 +130,15 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => MyAssetsScreen(api: widget.api, token: widget.token),
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: '联系家人',
+            icon: const Icon(Icons.person_search_outlined),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ConnectionsScreen(api: widget.api, token: widget.token),
               ),
             ),
           ),

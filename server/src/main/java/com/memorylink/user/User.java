@@ -34,6 +34,9 @@ public class User {
     @Column(name = "age_group", length = 20)
     private String ageGroup;
 
+    @Column(name = "birth_place", length = 100)
+    private String birthPlace;
+
     @Column(nullable = false, length = 20)
     private String role = "USER";
 
@@ -110,6 +113,14 @@ public class User {
 
     public void setAgeGroup(String ageGroup) {
         this.ageGroup = ageGroup;
+    }
+
+    public String getBirthPlace() {
+        return birthPlace;
+    }
+
+    public void setBirthPlace(String birthPlace) {
+        this.birthPlace = birthPlace;
     }
 
     public String getRole() {

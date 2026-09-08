@@ -31,6 +31,9 @@ public class ProfileService {
         if (request.birthDate() != null) {
             user.setBirthDate(request.birthDate());
         }
+        if (request.birthPlace() != null && !request.birthPlace().isBlank()) {
+            user.setBirthPlace(request.birthPlace().trim());
+        }
         userRepository.save(user);
         return toResponse(user);
     }
@@ -41,6 +44,7 @@ public class ProfileService {
     }
 
     private ProfileResponse toResponse(User user) {
-        return new ProfileResponse(user.getId(), user.getPhone(), user.getName(), user.getBirthDate());
+        return new ProfileResponse(user.getId(), user.getPhone(), user.getName(),
+                user.getBirthDate(), user.getBirthPlace());
     }
 }

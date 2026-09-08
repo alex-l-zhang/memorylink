@@ -153,6 +153,40 @@ class ApiClient {
     return InviteInfo.fromJson(data as Map<String, dynamic>);
   }
 
+  Future<List<UserCandidate>> searchConnections(String token, String name) async {
+    final data = await _get(
+      '/api/v1/connections/search?name=${Uri.encodeQueryComponent(name)}',
+      token: token,
+    );
+    return (data as List)
+        .map((e) => UserCandidate.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> sendConnections(
+    String token, {
+    required List<int> targetIds,
+    required String relation,
+  }) async {
+    await _post('/api/v1/connections/requests',
+        {'targetIds': targetIds, 'relation': relation}, token: token);
+  }
+
+  Future<List<ConnectionRequestItem>> incomingConnections(String token) async {
+    final data = await _get('/api/v1/connections/requests/incoming', token: token);
+    return (data as List)
+        .map((e) => ConnectionRequestItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> acceptConnection(String token, int requestId) async {
+    await _post('/api/v1/connections/requests/$requestId/accept', const {}, token: token);
+  }
+
+  Future<void> rejectConnection(String token, int requestId) async {
+    await _post('/api/v1/connections/requests/$requestId/reject', const {}, token: token);
+  }
+
   Future<UserProfile> me(String token) async {
     final data = await _get('/api/v1/users/me', token: token);
     return UserProfile.fromJson(data as Map<String, dynamic>);

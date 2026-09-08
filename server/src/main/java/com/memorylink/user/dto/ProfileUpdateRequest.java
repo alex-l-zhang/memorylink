@@ -9,6 +9,9 @@ public record ProfileUpdateRequest(
         String name,
 
         @PastOrPresent(message = "出生日期不能晚于今天")
-        LocalDate birthDate
+        LocalDate birthDate,
+
+        @Size(max = 100, message = "籍贯过长")
+        String birthPlace
 ) {
 }

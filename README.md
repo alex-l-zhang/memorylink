@@ -110,4 +110,5 @@ cd admin && npm install && npm run dev # 平台后台管理（默认 5174）
 - 《忆联（MemoryLink）产品需求说明书 V1.7》
 - 《忆联（MemoryLink）试点项目计划 V1.4》
 - 《忆联（MemoryLink）技术架构设计书 V1.4》
+- 《忆联（MemoryLink）系统启动手册》（含各模块启动命令）
 - 《忆联（MemoryLink）开发进度跟踪》（长期维护）

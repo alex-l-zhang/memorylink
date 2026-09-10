@@ -77,7 +77,7 @@ class ConnectionServiceTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "李四", "1990-01-01", "杭州")));
         when(userRepository.findById(2L)).thenReturn(Optional.of(user(2L, "张三", null, null)));
 
-        int sent = service.send(1L, List.of(2L), "FRIEND");
+        int sent = service.send(1L, List.of(2L), "SON", "FATHER");
 
         assertThat(sent).isEqualTo(1);
         verify(requestRepository).save(any(ConnectionRequest.class));

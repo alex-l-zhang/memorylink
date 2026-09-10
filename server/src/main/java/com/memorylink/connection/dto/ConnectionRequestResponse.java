@@ -9,6 +9,7 @@ public record ConnectionRequestResponse(
         Integer birthMonth,
         String birthPlace,
         String relation,
+        String inverseRelation,
         String status,
         Instant createdAt
 ) {

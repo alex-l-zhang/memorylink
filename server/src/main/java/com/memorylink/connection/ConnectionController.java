@@ -34,7 +34,8 @@ public class ConnectionController {
     @PostMapping("/requests")
     public ApiResponse<Map<String, Integer>> send(@Valid @RequestBody SendConnectionRequest request) {
         int sent = connectionService.send(
-                SecurityUtils.currentUser().userId(), request.targetIds(), request.relation());
+                SecurityUtils.currentUser().userId(), request.targetIds(),
+                request.relation(), request.inverseRelation());
         return ApiResponse.ok(Map.of("sent", sent));
     }
 

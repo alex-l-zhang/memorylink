@@ -17,6 +17,7 @@ import com.memorylink.common.BusinessException;
 import com.memorylink.family.Family;
 import com.memorylink.family.FamilyService;
 import com.memorylink.storage.MediaStorage;
+import com.memorylink.connection.FamilyRelationshipRepository;
 import java.io.ByteArrayInputStream;
 import java.time.LocalDate;
 import java.util.Optional;
@@ -38,12 +39,15 @@ class LovedOneServiceTest {
     private FamilyService familyService;
     @Mock
     private MediaStorage mediaStorage;
+    @Mock
+    private FamilyRelationshipRepository relationshipRepository;
 
     private LovedOneService service;
 
     @BeforeEach
     void setUp() {
-        service = new LovedOneService(lovedOneRepository, mediaFileRepository, familyService, mediaStorage);
+        service = new LovedOneService(lovedOneRepository, mediaFileRepository, familyService,
+                mediaStorage, relationshipRepository);
     }
 
     @Test

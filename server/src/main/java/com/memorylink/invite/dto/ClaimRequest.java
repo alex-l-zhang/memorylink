@@ -7,6 +7,8 @@ public record ClaimRequest(
         String code,
 
         @NotBlank(message = "关系不能为空")
-        String relation
+        String relation,
+
+        String inverseRelation
 ) {
 }

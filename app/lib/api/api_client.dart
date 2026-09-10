@@ -136,10 +136,11 @@ class ApiClient {
     String token,
     String code,
     String relation,
+    String inverseRelation,
   ) async {
     final data = await _post(
       '/api/v1/invites/claim',
-      {'code': code, 'relation': relation},
+      {'code': code, 'relation': relation, 'inverseRelation': inverseRelation},
       token: token,
     );
     return ClaimResult.fromJson(data as Map<String, dynamic>);
@@ -167,9 +168,16 @@ class ApiClient {
     String token, {
     required List<int> targetIds,
     required String relation,
+    required String inverseRelation,
   }) async {
-    await _post('/api/v1/connections/requests',
-        {'targetIds': targetIds, 'relation': relation}, token: token);
+    await _post(
+        '/api/v1/connections/requests',
+        {
+          'targetIds': targetIds,
+          'relation': relation,
+          'inverseRelation': inverseRelation,
+        },
+        token: token);
   }
 
   Future<List<ConnectionRequestItem>> incomingConnections(String token) async {

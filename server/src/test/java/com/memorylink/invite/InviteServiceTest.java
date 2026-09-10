@@ -17,6 +17,7 @@ import com.memorylink.family.FamilyMember;
 import com.memorylink.family.FamilyMemberRepository;
 import com.memorylink.family.FamilyService;
 import com.memorylink.family.MemberProfileService;
+import com.memorylink.connection.FamilyRelationshipRepository;
 import com.memorylink.invite.dto.ClaimResponse;
 import com.memorylink.invite.dto.InviteKeyResponse;
 import java.time.Instant;
@@ -45,6 +46,8 @@ class InviteServiceTest {
     private UserRepository userRepository;
     @Mock
     private MemberProfileService memberProfileService;
+    @Mock
+    private FamilyRelationshipRepository relationshipRepository;
 
     private InviteService service;
 
@@ -52,7 +55,7 @@ class InviteServiceTest {
     void setUp() {
         service = new InviteService(inviteKeyRepository, lovedOneRepository,
                 familyService, familyMemberRepository, auditLogRepository, userRepository,
-                memberProfileService);
+                memberProfileService, relationshipRepository);
     }
 
     private LovedOne lovedOne(Long familyId) {
@@ -116,7 +119,7 @@ class InviteServiceTest {
         when(familyMemberRepository.save(any(FamilyMember.class))).thenAnswer(inv -> inv.getArgument(0));
         when(inviteKeyRepository.save(any(InviteKey.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        ClaimResponse response = service.claim(7L, "ABCD-EFGH-JKLM-NPQR", "CHILD");
+        ClaimResponse response = service.claim(7L, "ABCD-EFGH-JKLM-NPQR", "CHILD", null);
 
         assertThat(response.familyId()).isEqualTo(9L);
         assertThat(response.role()).isEqualTo("VIEWER");
@@ -134,7 +137,7 @@ class InviteServiceTest {
         InviteKey key = activeKey(Instant.now().minusSeconds(60));
         when(inviteKeyRepository.findFirstByCodeHashOrderByIdDesc(anyString())).thenReturn(Optional.of(key));
 
-        assertThatThrownBy(() -> service.claim(7L, "ABCD-EFGH-JKLM-NPQR", "CHILD"))
+        assertThatThrownBy(() -> service.claim(7L, "ABCD-EFGH-JKLM-NPQR", "CHILD", null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("无效或已过期");
     }

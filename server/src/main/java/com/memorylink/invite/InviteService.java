@@ -9,6 +9,9 @@ import com.memorylink.family.FamilyMember;
 import com.memorylink.family.FamilyMemberRepository;
 import com.memorylink.family.FamilyService;
 import com.memorylink.family.MemberProfileService;
+import com.memorylink.connection.FamilyRelationship;
+import com.memorylink.connection.FamilyRelationshipRepository;
+import com.memorylink.connection.RelationCatalog;
 import com.memorylink.invite.dto.ClaimResponse;
 import com.memorylink.invite.dto.InviteKeyResponse;
 import com.memorylink.invite.dto.InviteInfoResponse;
@@ -33,11 +36,9 @@ public class InviteService {
 
     private static final String CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final Set<String> ROLES = Set.of("VIEWER", "EDITOR");
-    private static final Set<String> RELATIONS =
-            Set.of("SPOUSE", "CHILD", "GRANDCHILD", "SIBLING", "FRIEND", "OTHER");
-
     private final com.memorylink.user.UserRepository userRepository;
     private final MemberProfileService memberProfileService;
+    private final FamilyRelationshipRepository relationshipRepository;
 
     private final InviteKeyRepository inviteKeyRepository;
     private final LovedOneRepository lovedOneRepository;
@@ -52,7 +53,8 @@ public class InviteService {
                          FamilyMemberRepository familyMemberRepository,
                          AuditLogRepository auditLogRepository,
                          com.memorylink.user.UserRepository userRepository,
-                         MemberProfileService memberProfileService) {
+                         MemberProfileService memberProfileService,
+                         FamilyRelationshipRepository relationshipRepository) {
         this.inviteKeyRepository = inviteKeyRepository;
         this.lovedOneRepository = lovedOneRepository;
         this.familyService = familyService;
@@ -60,6 +62,7 @@ public class InviteService {
         this.auditLogRepository = auditLogRepository;
         this.userRepository = userRepository;
         this.memberProfileService = memberProfileService;
+        this.relationshipRepository = relationshipRepository;
     }
 
     @Transactional
@@ -94,7 +97,7 @@ public class InviteService {
     }
 
     @Transactional
-    public ClaimResponse claim(Long userId, String code, String relation) {
+    public ClaimResponse claim(Long userId, String code, String relation, String inverseRelation) {
         String normalized = normalize(code);
         InviteKey key = inviteKeyRepository.findFirstByCodeHashOrderByIdDesc(sha256Hex(normalized))
                 .orElseThrow(() -> new BusinessException(CODE_KEY_INVALID, "邀请码无效或已过期"));
@@ -104,8 +107,13 @@ public class InviteService {
             throw new BusinessException(CODE_KEY_INVALID, "邀请码无效或已过期");
         }
         String targetRelation = relation == null ? "" : relation.trim().toUpperCase();
-        if (!RELATIONS.contains(targetRelation)) {
-            throw new BusinessException(CODE_INVALID, "关系仅支持 SPOUSE/CHILD/GRANDCHILD/SIBLING/FRIEND/OTHER");
+        if (!RelationCatalog.isValid(targetRelation)) {
+            throw new BusinessException(CODE_INVALID, "请选择有效的亲属关系");
+        }
+        String targetInverse = inverseRelation == null || inverseRelation.isBlank()
+                ? null : inverseRelation.trim().toUpperCase();
+        if (targetInverse != null && !RelationCatalog.isValid(targetInverse)) {
+            throw new BusinessException(CODE_INVALID, "请选择有效的亲属关系");
         }
         LovedOne lovedOne = lovedOneRepository.findById(key.getLovedOneId())
                 .orElseThrow(() -> new BusinessException(CODE_ARCHIVE_NOT_FOUND, "档案不存在"));
@@ -124,6 +132,21 @@ public class InviteService {
         familyMemberRepository.save(member);
         memberProfileService.ensureMemberProfile(lovedOne.getFamilyId(), key.getCreatedBy());
         memberProfileService.ensureMemberProfile(lovedOne.getFamilyId(), userId);
+        boolean relationshipExists = relationshipRepository
+                .findByUserAIdAndUserBId(key.getCreatedBy(), userId)
+                .or(() -> relationshipRepository.findByUserBIdAndUserAId(key.getCreatedBy(), userId))
+                .isPresent();
+        if (!relationshipExists) {
+            FamilyRelationship relationship = new FamilyRelationship();
+            relationship.setUserAId(key.getCreatedBy());
+            relationship.setUserBId(userId);
+            relationship.setRelationAToB(RelationCatalog.normalizeLegacy(targetRelation));
+            relationship.setRelationBToA(targetInverse == null
+                    ? RelationCatalog.normalizeLegacy(inverseGeneric(targetRelation))
+                    : RelationCatalog.normalizeLegacy(targetInverse));
+            relationship.setStatus("ACTIVE");
+            relationshipRepository.save(relationship);
+        }
 
         key.setUsedCount(key.getUsedCount() + 1);
         if (key.getUsedCount() >= key.getMaxUses()) {
@@ -186,6 +209,16 @@ public class InviteService {
 
     private String normalize(String code) {
         return code == null ? "" : code.replaceAll("[^A-Za-z0-9]", "").toUpperCase();
+    }
+
+    private String inverseGeneric(String relation) {
+        return switch (relation) {
+            case "PARENT" -> "CHILD";
+            case "CHILD" -> "PARENT";
+            case "GRANDPARENT" -> "GRANDCHILD";
+            case "GRANDCHILD" -> "GRANDPARENT";
+            default -> relation;
+        };
     }
 
     private String maskPhone(String phone) {

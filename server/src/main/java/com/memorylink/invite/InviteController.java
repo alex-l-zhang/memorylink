@@ -37,7 +37,8 @@ public class InviteController {
     @PostMapping("/invites/claim")
     public ApiResponse<ClaimResponse> claim(@Valid @RequestBody ClaimRequest request) {
         return ApiResponse.ok(inviteService.claim(
-                SecurityUtils.currentUser().userId(), request.code(), request.relation()));
+                SecurityUtils.currentUser().userId(), request.code(),
+                request.relation(), request.inverseRelation()));
     }
 
     @GetMapping("/invites/info")

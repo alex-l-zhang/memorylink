@@ -57,6 +57,7 @@ class _SearchTabState extends State<_SearchTab> {
   List<UserCandidate> _results = [];
   final Set<int> _selected = {};
   String _relation = 'FRIEND';
+  String _inverseRelation = 'FRIEND';
   bool _searching = false;
   bool _sending = false;
   String? _error;
@@ -105,6 +106,7 @@ class _SearchTabState extends State<_SearchTab> {
         widget.token,
         targetIds: _selected.toList(),
         relation: _relation,
+        inverseRelation: _inverseRelation,
       );
       if (!mounted) return;
       setState(() {
@@ -172,12 +174,23 @@ class _SearchTabState extends State<_SearchTab> {
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             initialValue: _relation,
-            decoration: const InputDecoration(labelText: '我是 TA 的：', border: OutlineInputBorder()),
+            decoration: const InputDecoration(labelText: 'TA 是我的：', border: OutlineInputBorder()),
             items: connectionRelationOptions
                 .map((o) => DropdownMenuItem(value: o.code, child: Text(o.label)))
                 .toList(),
             onChanged: (value) {
               if (value != null) setState(() => _relation = value);
+            },
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            initialValue: _inverseRelation,
+            decoration: const InputDecoration(labelText: '我是 TA 的：', border: OutlineInputBorder()),
+            items: connectionRelationOptions
+                .map((o) => DropdownMenuItem(value: o.code, child: Text(o.label)))
+                .toList(),
+            onChanged: (value) {
+              if (value != null) setState(() => _inverseRelation = value);
             },
           ),
           const SizedBox(height: 12),
@@ -286,7 +299,7 @@ class _IncomingTabState extends State<_IncomingTab> {
                       style: const TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   Text('对方：${_birthText(item.birthYear, item.birthMonth)} · 籍贯：${item.birthPlace ?? '未填写'}'),
-                  Text('对方声称的关系：我是你的${_relationLabel(item.relation)}'),
+                  Text('对方是我的${_relationLabel(item.inverseRelation ?? item.relation)}'),
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,

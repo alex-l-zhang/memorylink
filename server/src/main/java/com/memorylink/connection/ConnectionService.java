@@ -27,9 +27,6 @@ public class ConnectionService {
     public static final int CODE_USER_NOT_FOUND = 3003;
     public static final int CODE_ALREADY = 3008;
 
-    private static final Set<String> RELATIONS =
-            Set.of("SPOUSE", "PARENT", "CHILD", "GRANDPARENT", "GRANDCHILD", "SIBLING", "FRIEND", "OTHER");
-
     private final UserRepository userRepository;
     private final ConnectionRequestRepository requestRepository;
     private final FamilyRelationshipRepository relationshipRepository;
@@ -72,10 +69,11 @@ public class ConnectionService {
     }
 
     @Transactional
-    public int send(Long userId, List<Long> targetIds, String relation) {
+    public int send(Long userId, List<Long> targetIds, String relation, String inverseRelation) {
         String rel = relation == null ? "" : relation.trim().toUpperCase();
-        if (!RELATIONS.contains(rel)) {
-            throw new BusinessException(CODE_INVALID, "关系仅支持 SPOUSE/PARENT/CHILD/GRANDPARENT/GRANDCHILD/SIBLING/FRIEND/OTHER");
+        String inverse = inverseRelation == null ? "" : inverseRelation.trim().toUpperCase();
+        if (!RelationCatalog.isValid(rel) || !RelationCatalog.isValid(inverse)) {
+            throw new BusinessException(CODE_INVALID, "请选择有效的亲属关系");
         }
         User me = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(CODE_USER_NOT_FOUND, "用户不存在"));
@@ -97,6 +95,7 @@ public class ConnectionService {
             }
             request.setBirthPlace(me.getBirthPlace());
             request.setRelation(rel);
+            request.setInverseRelation(inverse);
             request.setStatus("PENDING");
             requestRepository.save(request);
             sent++;
@@ -122,7 +121,9 @@ public class ConnectionService {
             FamilyMember member = new FamilyMember();
             member.setFamilyId(family.getId());
             member.setUserId(userId);
-            member.setRelation(inverse(request.getRelation()));
+            member.setRelation(request.getInverseRelation() == null
+                    ? RelationCatalog.normalizeLegacy(inverse(request.getRelation()))
+                    : request.getInverseRelation());
             member.setRole("VIEWER");
             member.setStatus("ACTIVE");
             member.setEvidenceStatus("SELF_DECLARED");
@@ -134,8 +135,10 @@ public class ConnectionService {
         FamilyRelationship relationship = new FamilyRelationship();
         relationship.setUserAId(requester.getId());
         relationship.setUserBId(userId);
-        relationship.setRelationAToB(request.getRelation());
-        relationship.setRelationBToA(inverse(request.getRelation()));
+        relationship.setRelationAToB(RelationCatalog.normalizeLegacy(request.getRelation()));
+        relationship.setRelationBToA(request.getInverseRelation() == null
+                ? RelationCatalog.normalizeLegacy(inverse(request.getRelation()))
+                : RelationCatalog.normalizeLegacy(request.getInverseRelation()));
         relationship.setStatus("ACTIVE");
         relationshipRepository.save(relationship);
         request.setStatus("ACCEPTED");
@@ -196,6 +199,7 @@ public class ConnectionService {
                 request.getBirthMonth(),
                 request.getBirthPlace(),
                 request.getRelation(),
+                request.getInverseRelation(),
                 request.getStatus(),
                 request.getCreatedAt()
         );

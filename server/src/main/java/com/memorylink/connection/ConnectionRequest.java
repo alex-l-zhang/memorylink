@@ -38,6 +38,9 @@ public class ConnectionRequest {
     @Column(nullable = false, length = 30)
     private String relation;
 
+    @Column(name = "inverse_relation", length = 30)
+    private String inverseRelation;
+
     @Column(nullable = false, length = 20)
     private String status = "PENDING";
 
@@ -117,6 +120,14 @@ public class ConnectionRequest {
 
     public void setRelation(String relation) {
         this.relation = relation;
+    }
+
+    public String getInverseRelation() {
+        return inverseRelation;
+    }
+
+    public void setInverseRelation(String inverseRelation) {
+        this.inverseRelation = inverseRelation;
     }
 
     public String getStatus() {

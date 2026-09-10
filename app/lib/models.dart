@@ -25,6 +25,7 @@ class LovedOne {
   final bool isDeceased;
   final bool aiPersonaEnabled;
   final int? userId;
+  final String? relationToMe;
 
   LovedOne({
     required this.id,
@@ -37,6 +38,7 @@ class LovedOne {
     this.isDeceased = true,
     this.aiPersonaEnabled = false,
     this.userId,
+    this.relationToMe,
   });
 
   factory LovedOne.fromJson(Map<String, dynamic> json) => LovedOne(
@@ -50,9 +52,16 @@ class LovedOne {
         isDeceased: json['isDeceased'] as bool? ?? true,
         aiPersonaEnabled: json['aiPersonaEnabled'] as bool? ?? false,
         userId: (json['userId'] as num?)?.toInt(),
+        relationToMe: json['relationToMe'] as String?,
       );
 
-  LovedOne copyWith({bool? isDeceased, bool? aiPersonaEnabled, int? userId}) => LovedOne(
+  LovedOne copyWith({
+    bool? isDeceased,
+    bool? aiPersonaEnabled,
+    int? userId,
+    String? relationToMe,
+  }) =>
+      LovedOne(
         id: id,
         familyId: familyId,
         name: name,
@@ -63,6 +72,7 @@ class LovedOne {
         isDeceased: isDeceased ?? this.isDeceased,
         aiPersonaEnabled: aiPersonaEnabled ?? this.aiPersonaEnabled,
         userId: userId ?? this.userId,
+        relationToMe: relationToMe ?? this.relationToMe,
       );
 
   bool get isEffectivelyDeceased {
@@ -235,6 +245,7 @@ class ConnectionRequestItem {
   final int? birthMonth;
   final String? birthPlace;
   final String relation;
+  final String? inverseRelation;
   final String status;
 
   ConnectionRequestItem({
@@ -244,6 +255,7 @@ class ConnectionRequestItem {
     this.birthMonth,
     this.birthPlace,
     required this.relation,
+    this.inverseRelation,
     required this.status,
   });
 
@@ -254,6 +266,7 @@ class ConnectionRequestItem {
         birthMonth: (json['birthMonth'] as num?)?.toInt(),
         birthPlace: json['birthPlace'] as String?,
         relation: json['relation'] as String? ?? '',
+        inverseRelation: json['inverseRelation'] as String?,
         status: json['status'] as String? ?? '',
       );
 }

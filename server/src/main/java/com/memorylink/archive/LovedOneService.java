@@ -8,6 +8,7 @@ import com.memorylink.family.Family;
 import com.memorylink.family.FamilyMember;
 import com.memorylink.family.FamilyService;
 import com.memorylink.storage.MediaStorage;
+import com.memorylink.connection.FamilyRelationshipRepository;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -30,15 +31,18 @@ public class LovedOneService {
     private final MediaFileRepository mediaFileRepository;
     private final FamilyService familyService;
     private final MediaStorage mediaStorage;
+    private final FamilyRelationshipRepository relationshipRepository;
 
     public LovedOneService(LovedOneRepository lovedOneRepository,
                            MediaFileRepository mediaFileRepository,
                            FamilyService familyService,
-                           MediaStorage mediaStorage) {
+                           MediaStorage mediaStorage,
+                           FamilyRelationshipRepository relationshipRepository) {
         this.lovedOneRepository = lovedOneRepository;
         this.mediaFileRepository = mediaFileRepository;
         this.familyService = familyService;
         this.mediaStorage = mediaStorage;
+        this.relationshipRepository = relationshipRepository;
     }
 
     @Transactional
@@ -69,7 +73,7 @@ public class LovedOneService {
             return List.of();
         }
         return lovedOneRepository.findByFamilyIdInOrderByCreatedAtDesc(familyIds)
-                .stream().map(this::toResponse).toList();
+                .stream().map(person -> toResponse(person, relationToMe(userId, person))).toList();
     }
 
     @Transactional(readOnly = true)
@@ -155,6 +159,10 @@ public class LovedOneService {
     }
 
     private LovedOneResponse toResponse(LovedOne lovedOne) {
+        return toResponse(lovedOne, null);
+    }
+
+    private LovedOneResponse toResponse(LovedOne lovedOne, String relationToMe) {
         return new LovedOneResponse(
                 lovedOne.getId(),
                 lovedOne.getFamilyId(),
@@ -167,8 +175,22 @@ public class LovedOneService {
                 lovedOne.effectiveDeceased(),
                 lovedOne.isAiPersonaEnabled(),
                 lovedOne.getUserId(),
+                relationToMe,
                 lovedOne.getCreatedAt()
         );
+    }
+
+    private String relationToMe(Long viewerId, LovedOne person) {
+        Long otherId = person.getUserId();
+        if (otherId == null || otherId.equals(viewerId)) {
+            return null;
+        }
+        var direct = relationshipRepository.findByUserAIdAndUserBId(viewerId, otherId);
+        if (direct.isPresent()) {
+            return direct.get().getRelationAToB();
+        }
+        var reverse = relationshipRepository.findByUserAIdAndUserBId(otherId, viewerId);
+        return reverse.map(rel -> rel.getRelationBToA()).orElse(null);
     }
 
     private boolean isDeceasedByDate(LocalDate deathDate) {

@@ -15,6 +15,7 @@ public record LovedOneResponse(
         boolean isDeceased,
         boolean aiPersonaEnabled,
         Long userId,
+        String relationToMe,
         Instant createdAt
 ) {
 }

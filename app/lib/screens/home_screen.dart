@@ -267,7 +267,12 @@ class _HomeScreenState extends State<HomeScreen> {
           leading: const CircleAvatar(child: Icon(Icons.person)),
           title: Text(item.name),
           subtitle: Text([
-            item.isEffectivelyDeceased ? '故人' : '在世',
+            if (item.userId == widget.userId)
+              '自己'
+            else if (item.relationToMe != null)
+              '对方是我的${relationLabel(item.relationToMe)}'
+            else
+              item.isEffectivelyDeceased ? '故人' : '在世',
             if (item.birthDate != null) '生 ${item.birthDate}',
             if (item.deathDate != null) '卒 ${item.deathDate}',
             if (item.birthPlace != null) item.birthPlace!,
@@ -503,6 +508,7 @@ class _ClaimDialog extends StatefulWidget {
 class _ClaimDialogState extends State<_ClaimDialog> {
   final _code = TextEditingController();
   String _relation = 'CHILD';
+  String _inverseRelation = 'FATHER';
   bool _submitting = false;
   bool _querying = false;
   InviteInfo? _info;
@@ -524,6 +530,7 @@ class _ClaimDialogState extends State<_ClaimDialog> {
         widget.token,
         _code.text.trim(),
         _relation,
+        _inverseRelation,
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -615,12 +622,23 @@ class _ClaimDialogState extends State<_ClaimDialog> {
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: _relation,
-              decoration: const InputDecoration(labelText: '你与邀请人的关系', border: OutlineInputBorder()),
+              decoration: const InputDecoration(labelText: '我是邀请人的：', border: OutlineInputBorder()),
               items: relationOptions
                   .map((o) => DropdownMenuItem(value: o.code, child: Text(o.label)))
                   .toList(),
               onChanged: (value) {
                 if (value != null) setState(() => _relation = value);
+              },
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _inverseRelation,
+              decoration: const InputDecoration(labelText: '邀请人是我的：', border: OutlineInputBorder()),
+              items: relationOptions
+                  .map((o) => DropdownMenuItem(value: o.code, child: Text(o.label)))
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) setState(() => _inverseRelation = value);
               },
             ),
           ],

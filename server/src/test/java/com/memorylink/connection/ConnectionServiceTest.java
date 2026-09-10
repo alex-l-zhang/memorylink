@@ -230,10 +230,6 @@ class ConnectionServiceTest {
         card.setUserId(2L);
         when(lovedOneRepository.findFirstByFamilyIdAndUserId(9L, 2L)).thenReturn(Optional.of(card));
         when(lovedOneRepository.findByUserId(2L)).thenReturn(List.of());
-        when(userRepository.findById(2L)).thenReturn(Optional.of(user(2L, "张三", null, null)));
-        com.memorylink.family.Family ownFamily = new com.memorylink.family.Family();
-        ownFamily.setId(11L);
-        when(familyService.getOrCreateDefaultFamily(2L, "张三")).thenReturn(ownFamily);
 
         service.removeRelationship(1L, 5L);
 

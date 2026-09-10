@@ -201,12 +201,7 @@ public class ConnectionService {
                 });
         // 若被解除方失去唯一档案卡，则在本人默认家族重建"自己"的档案卡
         if (lovedOneRepository.findByUserId(targetId).isEmpty()) {
-            userRepository.findById(targetId).ifPresent(target -> {
-                var ownFamily = familyService.getOrCreateDefaultFamily(targetId, target.getName());
-                if (ownFamily != null) {
-                    memberProfileService.ensureMemberProfile(ownFamily.getId(), targetId);
-                }
-            });
+            memberProfileService.ensureSelfProfile(targetId);
         }
         auditService.log("USER", userId, "RELATIONSHIP_REMOVED", "relationship:" + relationshipId,
                 Map.of("otherUserId", targetId.equals(userId) ? requesterId : targetId));
@@ -238,8 +233,8 @@ public class ConnectionService {
             member.setRelationSource("CONNECTION_REQUEST");
             familyMemberRepository.save(member);
         }
-        memberProfileService.ensureMemberProfile(family.getId(), requester.getId());
-        memberProfileService.ensureMemberProfile(family.getId(), userId);
+        memberProfileService.ensureSelfProfile(requester.getId());
+        memberProfileService.ensureSelfProfile(userId);
         FamilyRelationship relationship = relationshipRepository
                 .findByUserAIdAndUserBId(requester.getId(), userId)
                 .or(() -> relationshipRepository.findByUserBIdAndUserAId(requester.getId(), userId))

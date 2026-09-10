@@ -19,6 +19,7 @@ import com.memorylink.family.FamilyService;
 import com.memorylink.storage.MediaStorage;
 import com.memorylink.connection.FamilyRelationshipRepository;
 import com.memorylink.family.FamilyMember;
+import com.memorylink.family.MemberProfileService;
 import java.io.ByteArrayInputStream;
 import java.time.LocalDate;
 import java.util.List;
@@ -43,13 +44,15 @@ class LovedOneServiceTest {
     private MediaStorage mediaStorage;
     @Mock
     private FamilyRelationshipRepository relationshipRepository;
+    @Mock
+    private MemberProfileService memberProfileService;
 
     private LovedOneService service;
 
     @BeforeEach
     void setUp() {
         service = new LovedOneService(lovedOneRepository, mediaFileRepository, familyService,
-                mediaStorage, relationshipRepository);
+                mediaStorage, relationshipRepository, memberProfileService);
     }
 
     @Test

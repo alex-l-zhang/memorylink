@@ -7,6 +7,7 @@ import com.memorylink.common.BusinessException;
 import com.memorylink.family.Family;
 import com.memorylink.family.FamilyMember;
 import com.memorylink.family.FamilyService;
+import com.memorylink.family.MemberProfileService;
 import com.memorylink.storage.MediaStorage;
 import com.memorylink.connection.FamilyRelationshipRepository;
 import java.util.Collection;
@@ -36,17 +37,20 @@ public class LovedOneService {
     private final FamilyService familyService;
     private final MediaStorage mediaStorage;
     private final FamilyRelationshipRepository relationshipRepository;
+    private final MemberProfileService memberProfileService;
 
     public LovedOneService(LovedOneRepository lovedOneRepository,
                            MediaFileRepository mediaFileRepository,
                            FamilyService familyService,
                            MediaStorage mediaStorage,
-                           FamilyRelationshipRepository relationshipRepository) {
+                           FamilyRelationshipRepository relationshipRepository,
+                           MemberProfileService memberProfileService) {
         this.lovedOneRepository = lovedOneRepository;
         this.mediaFileRepository = mediaFileRepository;
         this.familyService = familyService;
         this.mediaStorage = mediaStorage;
         this.relationshipRepository = relationshipRepository;
+        this.memberProfileService = memberProfileService;
     }
 
     @Transactional
@@ -69,6 +73,7 @@ public class LovedOneService {
 
     @Transactional(readOnly = true)
     public List<LovedOneResponse> list(Long userId) {
+        memberProfileService.ensureSelfProfile(userId);
         List<FamilyMember> memberships = familyService.membershipsOf(userId).stream()
                 .filter(m -> "ACTIVE".equals(m.getStatus()))
                 .toList();
@@ -97,6 +102,23 @@ public class LovedOneService {
                     result.set(index, person);
                 }
                 chosenByUser.put(personUserId, person);
+            }
+        }
+        // 家族其他成员的"本人档案"动态带出（单份存储，不复制卡片）
+        for (FamilyMember membership : memberships) {
+            for (FamilyMember other : familyService.membersOf(membership.getFamilyId())) {
+                if (!"ACTIVE".equals(other.getStatus()) || other.getUserId().equals(userId)) {
+                    continue;
+                }
+                if (chosenByUser.containsKey(other.getUserId())) {
+                    continue;
+                }
+                lovedOneRepository.findFirstByUserIdOrderByIdAsc(other.getUserId())
+                        .filter(person -> !person.effectiveDeceased())
+                        .ifPresent(person -> {
+                            chosenByUser.put(other.getUserId(), person);
+                            result.add(person);
+                        });
             }
         }
         return result.stream().map(person -> toResponse(person, relationToMe(userId, person))).toList();

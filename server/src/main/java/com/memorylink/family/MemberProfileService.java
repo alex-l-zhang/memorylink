@@ -19,24 +19,30 @@ public class MemberProfileService {
 
     private final LovedOneRepository lovedOneRepository;
     private final UserRepository userRepository;
+    private final FamilyService familyService;
 
     public MemberProfileService(LovedOneRepository lovedOneRepository,
-                                UserRepository userRepository) {
+                                UserRepository userRepository,
+                                FamilyService familyService) {
         this.lovedOneRepository = lovedOneRepository;
         this.userRepository = userRepository;
+        this.familyService = familyService;
     }
 
+    /** 每位用户仅保留一份本人档案（单份存储，家族展示由成员关系动态带出）。 */
     @Transactional
-    public LovedOne ensureMemberProfile(Long familyId, Long userId) {
-        return lovedOneRepository.findFirstByFamilyIdAndUserId(familyId, userId)
-                .orElseGet(() -> create(familyId, userId));
+    public LovedOne ensureSelfProfile(Long userId) {
+        return lovedOneRepository.findFirstByUserIdOrderByIdAsc(userId)
+                .filter(person -> !person.effectiveDeceased())
+                .orElseGet(() -> create(userId));
     }
 
-    private LovedOne create(Long familyId, Long userId) {
+    private LovedOne create(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(CODE_USER_NOT_FOUND, "用户不存在"));
+        Family family = familyService.getOrCreateDefaultFamily(userId, user.getName());
         LovedOne person = new LovedOne();
-        person.setFamilyId(familyId);
+        person.setFamilyId(family.getId());
         person.setName(user.getName() == null || user.getName().isBlank() ? "家族成员" : user.getName());
         person.setBirthDate(user.getBirthDate());
         person.setBirthPlace(user.getBirthPlace());

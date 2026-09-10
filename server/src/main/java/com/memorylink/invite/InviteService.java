@@ -130,8 +130,8 @@ public class InviteService {
         member.setEvidenceStatus("SELF_DECLARED");
         member.setRelationSource("INVITE_KEY");
         familyMemberRepository.save(member);
-        memberProfileService.ensureMemberProfile(lovedOne.getFamilyId(), key.getCreatedBy());
-        memberProfileService.ensureMemberProfile(lovedOne.getFamilyId(), userId);
+        memberProfileService.ensureSelfProfile(key.getCreatedBy());
+        memberProfileService.ensureSelfProfile(userId);
         boolean relationshipExists = relationshipRepository
                 .findByUserAIdAndUserBId(key.getCreatedBy(), userId)
                 .or(() -> relationshipRepository.findByUserBIdAndUserAId(key.getCreatedBy(), userId))

@@ -233,7 +233,7 @@ class _IncomingTabState extends State<_IncomingTab> {
       _error = null;
     });
     try {
-      final requests = await widget.api.incomingConnections(widget.token);
+      final requests = await widget.api.receivedConnections(widget.token);
       if (!mounted) return;
       setState(() => _requests = requests);
     } on ApiException catch (e) {
@@ -290,32 +290,40 @@ class _IncomingTabState extends State<_IncomingTab> {
         itemCount: _requests.length,
         itemBuilder: (context, index) {
           final item = _requests[index];
+          final pending = item.status == 'PENDING';
+          final statusText = pending
+              ? '等待我处理'
+              : item.status == 'ACCEPTED'
+                  ? '已同意'
+                  : '已拒绝';
           return Card(
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${item.requesterName} 想与你建立联系',
+                  Text('${item.requesterName} ${pending ? '想与你建立联系' : '的联系请求（$statusText）'}',
                       style: const TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   Text('对方：${_birthText(item.birthYear, item.birthMonth)} · 籍贯：${item.birthPlace ?? '未填写'}'),
                   Text('对方是我的${_relationLabel(item.relation)}'),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      OutlinedButton(
-                        onPressed: () => _respond(item, false),
-                        child: const Text('拒绝'),
-                      ),
-                      const SizedBox(width: 8),
-                      FilledButton(
-                        onPressed: () => _respond(item, true),
-                        child: const Text('同意'),
-                      ),
-                    ],
-                  ),
+                  if (pending) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        OutlinedButton(
+                          onPressed: () => _respond(item, false),
+                          child: const Text('拒绝'),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          onPressed: () => _respond(item, true),
+                          child: const Text('同意'),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

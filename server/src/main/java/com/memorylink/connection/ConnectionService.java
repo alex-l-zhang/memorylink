@@ -111,6 +111,12 @@ public class ConnectionService {
     }
 
     @Transactional(readOnly = true)
+    public List<ConnectionRequestResponse> received(Long userId) {
+        return requestRepository.findByTargetIdOrderByCreatedAtDesc(userId).stream()
+                .map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<ConnectionHistoryResponse> outgoing(Long userId) {
         return requestRepository.findByRequesterIdOrderByCreatedAtDesc(userId).stream()
                 .map(request -> {
@@ -224,7 +230,8 @@ public class ConnectionService {
                 request.getRelation(),
                 request.getInverseRelation(),
                 request.getStatus(),
-                request.getCreatedAt()
+                request.getCreatedAt(),
+                request.getRespondedAt()
         );
     }
 }

@@ -45,6 +45,11 @@ public class ConnectionController {
         return ApiResponse.ok(connectionService.incoming(SecurityUtils.currentUser().userId()));
     }
 
+    @GetMapping("/requests/received")
+    public ApiResponse<List<ConnectionRequestResponse>> received() {
+        return ApiResponse.ok(connectionService.received(SecurityUtils.currentUser().userId()));
+    }
+
     @GetMapping("/requests/outgoing")
     public ApiResponse<List<ConnectionHistoryResponse>> outgoing() {
         return ApiResponse.ok(connectionService.outgoing(SecurityUtils.currentUser().userId()));

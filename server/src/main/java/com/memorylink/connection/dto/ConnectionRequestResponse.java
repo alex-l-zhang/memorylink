@@ -11,6 +11,7 @@ public record ConnectionRequestResponse(
         String relation,
         String inverseRelation,
         String status,
-        Instant createdAt
+        Instant createdAt,
+        Instant respondedAt
 ) {
 }

@@ -258,6 +258,8 @@ class ConnectionRequestItem {
   final String relation;
   final String? inverseRelation;
   final String status;
+  final String? createdAt;
+  final String? respondedAt;
 
   ConnectionRequestItem({
     required this.id,
@@ -268,6 +270,8 @@ class ConnectionRequestItem {
     required this.relation,
     this.inverseRelation,
     required this.status,
+    this.createdAt,
+    this.respondedAt,
   });
 
   factory ConnectionRequestItem.fromJson(Map<String, dynamic> json) => ConnectionRequestItem(
@@ -279,6 +283,8 @@ class ConnectionRequestItem {
         relation: json['relation'] as String? ?? '',
         inverseRelation: json['inverseRelation'] as String?,
         status: json['status'] as String? ?? '',
+        createdAt: json['createdAt'] as String?,
+        respondedAt: json['respondedAt'] as String?,
       );
 }
 

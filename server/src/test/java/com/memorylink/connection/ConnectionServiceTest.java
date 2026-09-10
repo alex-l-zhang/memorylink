@@ -13,6 +13,7 @@ import com.memorylink.family.Family;
 import com.memorylink.family.FamilyMemberRepository;
 import com.memorylink.family.FamilyService;
 import com.memorylink.family.MemberProfileService;
+import com.memorylink.notification.NotificationService;
 import com.memorylink.user.User;
 import com.memorylink.user.UserRepository;
 import com.memorylink.archive.LovedOne;
@@ -49,6 +50,8 @@ class ConnectionServiceTest {
     private LovedOneRepository lovedOneRepository;
     @Mock
     private FamilyRepository familyRepository;
+    @Mock
+    private NotificationService notificationService;
 
     private ConnectionService service;
 
@@ -56,7 +59,7 @@ class ConnectionServiceTest {
     void setUp() {
         service = new ConnectionService(userRepository, requestRepository, relationshipRepository,
                 familyService, familyMemberRepository, auditService, memberProfileService,
-                lovedOneRepository, familyRepository);
+                lovedOneRepository, familyRepository, notificationService);
     }
 
     private User user(Long id, String name, String birth, String place) {
@@ -197,6 +200,8 @@ class ConnectionServiceTest {
         relationship.setRelationAToB("SON");
         relationship.setRelationBToA("FATHER");
         relationship.setStatus("ACTIVE");
+        relationship.setAStatus("ACTIVE");
+        relationship.setBStatus("ACTIVE");
         when(relationshipRepository.findByUserBId(1L)).thenReturn(List.of(relationship));
         when(userRepository.findById(2L)).thenReturn(Optional.of(user(2L, "张三", null, null)));
 
@@ -206,6 +211,31 @@ class ConnectionServiceTest {
         assertThat(list.get(0).otherName()).isEqualTo("张三");
         assertThat(list.get(0).relationFromMe()).isEqualTo("FATHER");
         assertThat(list.get(0).relationFromOther()).isEqualTo("SON");
+        assertThat(list.get(0).myStatus()).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void relationshipsHideSideThatIsNotConfirmedYet() {
+        FamilyRelationship relationship = new FamilyRelationship();
+        relationship.setId(6L);
+        relationship.setUserAId(1L);
+        relationship.setUserBId(2L);
+        relationship.setRelationAToB(null);
+        relationship.setRelationBToA("SON");
+        relationship.setStatus("ACTIVE");
+        relationship.setAStatus("PENDING");
+        relationship.setBStatus("ACTIVE");
+        when(relationshipRepository.findByUserAId(1L)).thenReturn(List.of(relationship));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "我", null, null)));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user(2L, "张三", null, null)));
+
+        assertThat(service.relationships(1L)).isEmpty();
+        // 对方那一侧已确认，可以在图谱里看到"待我方确认"的半透明节点
+        var graph = service.graph(1L, true);
+        assertThat(graph.pendingCount()).isEqualTo(1);
+        assertThat(graph.nodes()).hasSize(1);
+        assertThat(graph.nodes().get(0).myStatus()).isEqualTo("PENDING");
+        assertThat(service.graph(1L, false).nodes()).isEmpty();
     }
 
     @Test

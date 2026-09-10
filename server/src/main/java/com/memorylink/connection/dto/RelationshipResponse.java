@@ -5,6 +5,7 @@ public record RelationshipResponse(
         Long otherUserId,
         String otherName,
         String relationFromMe,
-        String relationFromOther
+        String relationFromOther,
+        String myStatus
 ) {
 }

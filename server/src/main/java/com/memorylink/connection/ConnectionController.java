@@ -4,9 +4,11 @@ import com.memorylink.common.ApiResponse;
 import com.memorylink.connection.dto.ConnectionRequestResponse;
 import com.memorylink.connection.dto.ConnectionHistoryResponse;
 import com.memorylink.connection.dto.AcceptConnectionRequest;
+import com.memorylink.connection.dto.RelationshipGraphResponse;
 import com.memorylink.connection.dto.RelationshipResponse;
 import com.memorylink.connection.dto.SendConnectionRequest;
 import com.memorylink.connection.dto.UserCandidateResponse;
+import com.memorylink.notification.NotificationService;
 import com.memorylink.security.SecurityUtils;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -25,9 +27,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class ConnectionController {
 
     private final ConnectionService connectionService;
+    private final NotificationService notificationService;
 
-    public ConnectionController(ConnectionService connectionService) {
+    public ConnectionController(ConnectionService connectionService,
+                                NotificationService notificationService) {
         this.connectionService = connectionService;
+        this.notificationService = notificationService;
     }
 
     @GetMapping("/search")
@@ -61,6 +66,29 @@ public class ConnectionController {
     @GetMapping("/relationships")
     public ApiResponse<List<RelationshipResponse>> relationships() {
         return ApiResponse.ok(connectionService.relationships(SecurityUtils.currentUser().userId()));
+    }
+
+    @GetMapping("/graph")
+    public ApiResponse<RelationshipGraphResponse> graph(
+            @RequestParam(value = "includePending", defaultValue = "false") boolean includePending) {
+        return ApiResponse.ok(connectionService.graph(
+                SecurityUtils.currentUser().userId(), includePending));
+    }
+
+    @PostMapping("/relationships/{relationshipId}/confirm")
+    public ApiResponse<Void> confirmRelationship(@PathVariable Long relationshipId,
+                                                 @RequestBody(required = false) Map<String, String> body) {
+        String relation = body == null ? null : body.get("relation");
+        notificationService.confirmByRelationship(
+                SecurityUtils.currentUser().userId(), relationshipId, relation);
+        return ApiResponse.ok(null);
+    }
+
+    @PostMapping("/relationships/{relationshipId}/reject")
+    public ApiResponse<Void> rejectRelationship(@PathVariable Long relationshipId) {
+        notificationService.rejectByRelationship(
+                SecurityUtils.currentUser().userId(), relationshipId);
+        return ApiResponse.ok(null);
     }
 
     @DeleteMapping("/relationships/{relationshipId}")

@@ -9,12 +9,16 @@ import com.memorylink.family.FamilyMember;
 import com.memorylink.family.FamilyService;
 import com.memorylink.family.MemberProfileService;
 import com.memorylink.storage.MediaStorage;
+import com.memorylink.user.UserRepository;
 import com.memorylink.connection.FamilyRelationshipRepository;
+import com.memorylink.connection.FamilyRelationship;
+import com.memorylink.connection.RelationshipVisibility;
 import java.util.Collection;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -38,19 +42,22 @@ public class LovedOneService {
     private final MediaStorage mediaStorage;
     private final FamilyRelationshipRepository relationshipRepository;
     private final MemberProfileService memberProfileService;
+    private final UserRepository userRepository;
 
     public LovedOneService(LovedOneRepository lovedOneRepository,
                            MediaFileRepository mediaFileRepository,
                            FamilyService familyService,
                            MediaStorage mediaStorage,
                            FamilyRelationshipRepository relationshipRepository,
-                           MemberProfileService memberProfileService) {
+                           MemberProfileService memberProfileService,
+                           UserRepository userRepository) {
         this.lovedOneRepository = lovedOneRepository;
         this.mediaFileRepository = mediaFileRepository;
         this.familyService = familyService;
         this.mediaStorage = mediaStorage;
         this.relationshipRepository = relationshipRepository;
         this.memberProfileService = memberProfileService;
+        this.userRepository = userRepository;
     }
 
     @Transactional
@@ -67,6 +74,14 @@ public class LovedOneService {
         lovedOne.setCreatedBy(userId);
         lovedOne.setStatus("ACTIVE");
         lovedOne.setDeceased(isDeceasedByDate(request.deathDate()));
+        // 用户为自己建档（姓名与本人一致）且尚无本人档案时，直接绑定为本人，避免出现"两张自己"
+        String myName = userRepository.findById(userId)
+                .map(com.memorylink.user.User::getName).orElse(userName);
+        if (myName != null && !myName.isBlank() && myName.equals(request.name())
+                && lovedOneRepository.findFirstByUserIdOrderByIdAsc(userId).isEmpty()) {
+            lovedOne.setUserId(userId);
+            lovedOne.setDeceased(false);
+        }
         lovedOne = lovedOneRepository.save(lovedOne);
         return toResponse(lovedOne);
     }
@@ -121,7 +136,10 @@ public class LovedOneService {
                         });
             }
         }
-        return result.stream().map(person -> toResponse(person, relationToMe(userId, person))).toList();
+        return result.stream()
+                .filter(person -> visibleToUser(userId, person))
+                .map(person -> toResponse(person, relationToMe(userId, person)))
+                .toList();
     }
 
     /** 同一账号在多家族存在多张成员卡时，选择展示优先级更高的一张。 */
@@ -250,12 +268,28 @@ public class LovedOneService {
         if (otherId == null || otherId.equals(viewerId)) {
             return null;
         }
-        var direct = relationshipRepository.findByUserAIdAndUserBId(viewerId, otherId);
-        if (direct.isPresent()) {
-            return direct.get().getRelationAToB();
+        return relationshipBetween(viewerId, otherId)
+                .map(relationship -> RelationshipVisibility.relationFromMe(relationship, viewerId))
+                .orElse(null);
+    }
+
+    /**
+     * 关系自动建立、展示需双方各自确认：我这一侧未确认或已拒绝的家人，不在我的档案列表中出现。
+     * 从未建立过关系行时（历史数据）不做拦截，避免误伤。
+     */
+    private boolean visibleToUser(Long viewerId, LovedOne person) {
+        Long otherId = person.getUserId();
+        if (otherId == null || otherId.equals(viewerId)) {
+            return true;
         }
-        var reverse = relationshipRepository.findByUserAIdAndUserBId(otherId, viewerId);
-        return reverse.map(rel -> rel.getRelationBToA()).orElse(null);
+        return relationshipBetween(viewerId, otherId)
+                .map(relationship -> RelationshipVisibility.visibleTo(relationship, viewerId))
+                .orElse(true);
+    }
+
+    private Optional<FamilyRelationship> relationshipBetween(Long userId, Long otherId) {
+        return relationshipRepository.findByUserAIdAndUserBId(userId, otherId)
+                .or(() -> relationshipRepository.findByUserBIdAndUserAId(userId, otherId));
     }
 
     private boolean isDeceasedByDate(LocalDate deathDate) {

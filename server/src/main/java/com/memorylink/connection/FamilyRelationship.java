@@ -23,14 +23,28 @@ public class FamilyRelationship {
     @Column(name = "user_b_id", nullable = false)
     private Long userBId;
 
-    @Column(name = "relation_a_to_b", nullable = false, length = 30)
+    /** B 是 A 的谁（可空：未确认时为空）。 */
+    @Column(name = "relation_a_to_b", length = 30)
     private String relationAToB;
 
-    @Column(name = "relation_b_to_a", nullable = false, length = 30)
+    /** A 是 B 的谁（可空：未确认时为空）。 */
+    @Column(name = "relation_b_to_a", length = 30)
     private String relationBToA;
 
     @Column(nullable = false, length = 20)
     private String status = "ACTIVE";
+
+    @Column(name = "a_status", nullable = false, length = 20)
+    private String aStatus = "PENDING";
+
+    @Column(name = "b_status", nullable = false, length = 20)
+    private String bStatus = "PENDING";
+
+    @Column(name = "a_confirmed_at")
+    private Instant aConfirmedAt;
+
+    @Column(name = "b_confirmed_at")
+    private Instant bConfirmedAt;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -89,5 +103,37 @@ public class FamilyRelationship {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getAStatus() {
+        return aStatus;
+    }
+
+    public void setAStatus(String aStatus) {
+        this.aStatus = aStatus;
+    }
+
+    public String getBStatus() {
+        return bStatus;
+    }
+
+    public void setBStatus(String bStatus) {
+        this.bStatus = bStatus;
+    }
+
+    public Instant getAConfirmedAt() {
+        return aConfirmedAt;
+    }
+
+    public void setAConfirmedAt(Instant aConfirmedAt) {
+        this.aConfirmedAt = aConfirmedAt;
+    }
+
+    public Instant getBConfirmedAt() {
+        return bConfirmedAt;
+    }
+
+    public void setBConfirmedAt(Instant bConfirmedAt) {
+        this.bConfirmedAt = bConfirmedAt;
     }
 }

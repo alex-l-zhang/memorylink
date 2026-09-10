@@ -327,6 +327,7 @@ class RelationshipItem {
   final String otherName;
   final String relationFromMe;
   final String? relationFromOther;
+  final String? myStatus;
 
   RelationshipItem({
     required this.id,
@@ -334,6 +335,7 @@ class RelationshipItem {
     required this.otherName,
     required this.relationFromMe,
     this.relationFromOther,
+    this.myStatus,
   });
 
   factory RelationshipItem.fromJson(Map<String, dynamic> json) => RelationshipItem(
@@ -342,6 +344,128 @@ class RelationshipItem {
         otherName: json['otherName'] as String? ?? '',
         relationFromMe: json['relationFromMe'] as String? ?? '',
         relationFromOther: json['relationFromOther'] as String?,
+        myStatus: json['myStatus'] as String?,
+      );
+}
+
+/// 站内消息（当前用于家族成员关系确认）
+class NotificationItem {
+  final int id;
+  final String type;
+  final int? relationshipId;
+  final int? otherUserId;
+  final String? otherName;
+  final String title;
+  final String? body;
+  final String? suggestedRelation;
+  final String status;
+  final String? createdAt;
+
+  NotificationItem({
+    required this.id,
+    required this.type,
+    this.relationshipId,
+    this.otherUserId,
+    this.otherName,
+    required this.title,
+    this.body,
+    this.suggestedRelation,
+    required this.status,
+    this.createdAt,
+  });
+
+  bool get pending => status == 'UNREAD' || status == 'READ';
+
+  factory NotificationItem.fromJson(Map<String, dynamic> json) => NotificationItem(
+        id: (json['id'] as num).toInt(),
+        type: json['type'] as String? ?? '',
+        relationshipId: (json['relationshipId'] as num?)?.toInt(),
+        otherUserId: (json['otherUserId'] as num?)?.toInt(),
+        otherName: json['otherName'] as String?,
+        title: json['title'] as String? ?? '',
+        body: json['body'] as String?,
+        suggestedRelation: json['suggestedRelation'] as String?,
+        status: json['status'] as String? ?? 'UNREAD',
+        createdAt: json['createdAt'] as String?,
+      );
+}
+
+class NotificationList {
+  final List<NotificationItem> items;
+  final int unread;
+
+  NotificationList({required this.items, required this.unread});
+
+  factory NotificationList.fromJson(Map<String, dynamic> json) => NotificationList(
+        items: (json['items'] as List? ?? [])
+            .map((e) => NotificationItem.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        unread: (json['unread'] as num?)?.toInt() ?? 0,
+      );
+}
+
+/// 关系图谱节点
+class GraphNode {
+  final int userId;
+  final String name;
+  final int? birthYear;
+  final int? birthMonth;
+  final String? birthPlace;
+  final String? gender;
+  final int? relationshipId;
+  final String? relationFromMe;
+  final String? relationFromOther;
+  final String myStatus;
+  final String? otherStatus;
+  final bool pending;
+  final bool isSelf;
+
+  GraphNode({
+    required this.userId,
+    required this.name,
+    this.birthYear,
+    this.birthMonth,
+    this.birthPlace,
+    this.gender,
+    this.relationshipId,
+    this.relationFromMe,
+    this.relationFromOther,
+    required this.myStatus,
+    this.otherStatus,
+    this.pending = false,
+    this.isSelf = false,
+  });
+
+  factory GraphNode.fromJson(Map<String, dynamic> json) => GraphNode(
+        userId: (json['userId'] as num).toInt(),
+        name: json['name'] as String? ?? '',
+        birthYear: (json['birthYear'] as num?)?.toInt(),
+        birthMonth: (json['birthMonth'] as num?)?.toInt(),
+        birthPlace: json['birthPlace'] as String?,
+        gender: json['gender'] as String?,
+        relationshipId: (json['relationshipId'] as num?)?.toInt(),
+        relationFromMe: json['relationFromMe'] as String?,
+        relationFromOther: json['relationFromOther'] as String?,
+        myStatus: json['myStatus'] as String? ?? 'ACTIVE',
+        otherStatus: json['otherStatus'] as String?,
+        pending: json['pending'] as bool? ?? false,
+        isSelf: json['isSelf'] as bool? ?? false,
+      );
+}
+
+class RelationGraph {
+  final GraphNode self;
+  final List<GraphNode> nodes;
+  final int pendingCount;
+
+  RelationGraph({required this.self, required this.nodes, required this.pendingCount});
+
+  factory RelationGraph.fromJson(Map<String, dynamic> json) => RelationGraph(
+        self: GraphNode.fromJson(json['self'] as Map<String, dynamic>),
+        nodes: (json['nodes'] as List? ?? [])
+            .map((e) => GraphNode.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        pendingCount: (json['pendingCount'] as num?)?.toInt() ?? 0,
       );
 }
 

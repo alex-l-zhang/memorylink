@@ -18,6 +18,7 @@ import com.memorylink.family.FamilyMemberRepository;
 import com.memorylink.family.FamilyService;
 import com.memorylink.family.MemberProfileService;
 import com.memorylink.connection.FamilyRelationshipRepository;
+import com.memorylink.notification.NotificationService;
 import com.memorylink.invite.dto.ClaimResponse;
 import com.memorylink.invite.dto.InviteKeyResponse;
 import java.time.Instant;
@@ -48,6 +49,8 @@ class InviteServiceTest {
     private MemberProfileService memberProfileService;
     @Mock
     private FamilyRelationshipRepository relationshipRepository;
+    @Mock
+    private NotificationService notificationService;
 
     private InviteService service;
 
@@ -55,7 +58,7 @@ class InviteServiceTest {
     void setUp() {
         service = new InviteService(inviteKeyRepository, lovedOneRepository,
                 familyService, familyMemberRepository, auditLogRepository, userRepository,
-                memberProfileService, relationshipRepository);
+                memberProfileService, relationshipRepository, notificationService);
     }
 
     private LovedOne lovedOne(Long familyId) {
@@ -130,6 +133,8 @@ class InviteServiceTest {
         assertThat(memberCaptor.getValue().getEvidenceStatus()).isEqualTo("SELF_DECLARED");
         assertThat(key.getStatus()).isEqualTo("USED");
         assertThat(key.getUsedCount()).isEqualTo(1);
+        // 关系自动建立、展示需各自确认：邀请人这一侧由新人自述确定，新人自己那一侧待本人确认
+        verify(notificationService).fanoutOnJoin(9L, 7L, 1L, "CHILD", null);
     }
 
     @Test

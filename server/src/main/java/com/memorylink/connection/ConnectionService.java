@@ -4,8 +4,11 @@ import com.memorylink.audit.AuditService;
 import com.memorylink.common.BusinessException;
 import com.memorylink.connection.dto.ConnectionRequestResponse;
 import com.memorylink.connection.dto.ConnectionHistoryResponse;
+import com.memorylink.connection.dto.GraphNodeResponse;
+import com.memorylink.connection.dto.RelationshipGraphResponse;
 import com.memorylink.connection.dto.RelationshipResponse;
 import com.memorylink.archive.LovedOneRepository;
+import com.memorylink.notification.NotificationService;
 import com.memorylink.family.FamilyRepository;
 import com.memorylink.connection.dto.UserCandidateResponse;
 import com.memorylink.family.Family;
@@ -42,6 +45,7 @@ public class ConnectionService {
     private final MemberProfileService memberProfileService;
     private final LovedOneRepository lovedOneRepository;
     private final FamilyRepository familyRepository;
+    private final NotificationService notificationService;
 
     public ConnectionService(UserRepository userRepository,
                              ConnectionRequestRepository requestRepository,
@@ -51,7 +55,8 @@ public class ConnectionService {
                              AuditService auditService,
                              MemberProfileService memberProfileService,
                              LovedOneRepository lovedOneRepository,
-                             FamilyRepository familyRepository) {
+                             FamilyRepository familyRepository,
+                             NotificationService notificationService) {
         this.userRepository = userRepository;
         this.requestRepository = requestRepository;
         this.relationshipRepository = relationshipRepository;
@@ -61,6 +66,7 @@ public class ConnectionService {
         this.memberProfileService = memberProfileService;
         this.lovedOneRepository = lovedOneRepository;
         this.familyRepository = familyRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -154,24 +160,78 @@ public class ConnectionService {
 
     @Transactional(readOnly = true)
     public List<RelationshipResponse> relationships(Long userId) {
-        List<FamilyRelationship> all = new java.util.ArrayList<>();
-        all.addAll(relationshipRepository.findByUserAId(userId));
-        all.addAll(relationshipRepository.findByUserBId(userId));
-        return all.stream()
-                .filter(r -> "ACTIVE".equals(r.getStatus()))
+        return allOfMine(userId).stream()
+                .filter(r -> RelationshipVisibility.visibleTo(r, userId))
                 .map(r -> {
-                    boolean asA = r.getUserAId().equals(userId);
-                    Long otherId = asA ? r.getUserBId() : r.getUserAId();
+                    Long otherId = RelationshipVisibility.otherId(r, userId);
                     String otherName = userRepository.findById(otherId)
                             .map(User::getName).orElse("已注销用户");
                     return new RelationshipResponse(
                             r.getId(),
                             otherId,
                             otherName,
-                            asA ? r.getRelationAToB() : r.getRelationBToA(),
-                            asA ? r.getRelationBToA() : r.getRelationAToB());
+                            RelationshipVisibility.relationFromMe(r, userId),
+                            RelationshipVisibility.relationFromOther(r, userId),
+                            RelationshipVisibility.myStatus(r, userId));
                 })
                 .toList();
+    }
+
+    /**
+     * 以自己为中心的家族关系图谱。
+     * 默认只返回我已确认的家人；includePending=true 时附带"待确认"节点（半透明展示）。
+     */
+    @Transactional(readOnly = true)
+    public RelationshipGraphResponse graph(Long userId, boolean includePending) {
+        User me = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(CODE_USER_NOT_FOUND, "用户不存在"));
+        List<GraphNodeResponse> nodes = new java.util.ArrayList<>();
+        long pending = 0;
+        for (FamilyRelationship relationship : allOfMine(userId)) {
+            String myStatus = RelationshipVisibility.myStatus(relationship, userId);
+            if (myStatus == null || RelationshipVisibility.REMOVED.equals(myStatus)) {
+                continue;
+            }
+            boolean mine = RelationshipVisibility.ACTIVE.equals(myStatus);
+            if (!mine) {
+                pending++;
+                if (!includePending) {
+                    continue;
+                }
+            }
+            Long otherId = RelationshipVisibility.otherId(relationship, userId);
+            User other = userRepository.findById(otherId).orElse(null);
+            String otherStatus = RelationshipVisibility.sideStatus(relationship, otherId);
+            nodes.add(new GraphNodeResponse(
+                    otherId,
+                    other == null ? "已注销用户" : other.getName(),
+                    other == null || other.getBirthDate() == null ? null : other.getBirthDate().getYear(),
+                    other == null || other.getBirthDate() == null ? null : other.getBirthDate().getMonthValue(),
+                    other == null ? null : other.getBirthPlace(),
+                    other == null ? null : other.getGender(),
+                    relationship.getId(),
+                    RelationshipVisibility.relationFromMe(relationship, userId),
+                    mine ? RelationshipVisibility.relationFromOther(relationship, userId) : null,
+                    myStatus,
+                    otherStatus,
+                    !mine || !RelationshipVisibility.ACTIVE.equals(otherStatus),
+                    false));
+        }
+        GraphNodeResponse self = new GraphNodeResponse(
+                me.getId(), me.getName(),
+                me.getBirthDate() == null ? null : me.getBirthDate().getYear(),
+                me.getBirthDate() == null ? null : me.getBirthDate().getMonthValue(),
+                me.getBirthPlace(), me.getGender(),
+                null, null, null,
+                RelationshipVisibility.ACTIVE, RelationshipVisibility.ACTIVE, false, true);
+        return new RelationshipGraphResponse(self, nodes, pending);
+    }
+
+    private List<FamilyRelationship> allOfMine(Long userId) {
+        List<FamilyRelationship> all = new java.util.ArrayList<>();
+        all.addAll(relationshipRepository.findByUserAId(userId));
+        all.addAll(relationshipRepository.findByUserBId(userId));
+        return all;
     }
 
     @Transactional
@@ -242,12 +302,19 @@ public class ConnectionService {
         relationship.setUserAId(requester.getId());
         relationship.setUserBId(userId);
         // A=发起人, B=被联系人
-        // relationAToB：B 是 A 的谁（"你是我的 X"）
-        // relationBToA：A 是 B 的谁（"我是你的 Y"）
-        relationship.setRelationAToB(finalInverse);
+        // relationAToB：B 是 A 的谁（B 同意时给出"我是你的 Y" → A 眼中 B 是 Y）
+        // relationBToA：A 是 B 的谁（A 发起时给出"我是你的 X"）
+        relationship.setRelationAToB(RelationCatalog.normalizeLegacy(finalInverse));
         relationship.setRelationBToA(RelationCatalog.normalizeLegacy(request.getRelation()));
-        relationship.setStatus("ACTIVE");
+        relationship.setStatus(RelationshipVisibility.ACTIVE);
+        Instant now = Instant.now();
+        relationship.setAStatus(RelationshipVisibility.ACTIVE);
+        relationship.setBStatus(RelationshipVisibility.ACTIVE);
+        relationship.setAConfirmedAt(now);
+        relationship.setBConfirmedAt(now);
         relationshipRepository.save(relationship);
+        // 被联系人加入发起人的家族后，与家族其他成员自动建立"待确认"关系
+        notificationService.fanoutOnJoin(family.getId(), userId, requester.getId(), null, null);
         request.setStatus("ACCEPTED");
         request.setRespondedAt(Instant.now());
         request.setInverseRelation(finalInverse);
@@ -268,10 +335,10 @@ public class ConnectionService {
 
     private Set<Long> relatedIds(Long userId) {
         Set<Long> ids = relationshipRepository.findByUserAId(userId).stream()
-                .filter(r -> "ACTIVE".equals(r.getStatus()))
+                .filter(ConnectionService::notRemoved)
                 .map(FamilyRelationship::getUserBId).collect(Collectors.toSet());
         ids.addAll(relationshipRepository.findByUserBId(userId).stream()
-                .filter(r -> "ACTIVE".equals(r.getStatus()))
+                .filter(ConnectionService::notRemoved)
                 .map(FamilyRelationship::getUserAId).collect(Collectors.toSet()));
         ids.addAll(requestRepository.findByRequesterIdAndStatusOrderByCreatedAtDesc(userId, "PENDING").stream()
                 .map(ConnectionRequest::getTargetId).collect(Collectors.toSet()));
@@ -281,18 +348,25 @@ public class ConnectionService {
     }
 
     private void ensureNotConnected(Long userId, Long targetId, String targetName) {
-        boolean activeRelationship =
-                relationshipRepository.findByUserAIdAndUserBId(userId, targetId)
-                        .filter(r -> "ACTIVE".equals(r.getStatus())).isPresent()
-                || relationshipRepository.findByUserBIdAndUserAId(userId, targetId)
-                        .filter(r -> "ACTIVE".equals(r.getStatus())).isPresent();
-        if (activeRelationship) {
-            throw new BusinessException(CODE_ALREADY, "你与「" + targetName + "」已建立联系");
+        FamilyRelationship existing = relationshipRepository.findByUserAIdAndUserBId(userId, targetId)
+                .or(() -> relationshipRepository.findByUserBIdAndUserAId(userId, targetId))
+                .filter(ConnectionService::notRemoved)
+                .orElse(null);
+        if (existing != null) {
+            if (RelationshipVisibility.visibleTo(existing, userId)) {
+                throw new BusinessException(CODE_ALREADY, "你与「" + targetName + "」已建立联系");
+            }
+            throw new BusinessException(CODE_ALREADY,
+                    "你与「" + targetName + "」的关系待确认，请到消息中心或关系图谱处理");
         }
         if (requestRepository.existsByRequesterIdAndTargetIdAndStatus(userId, targetId, "PENDING")
                 || requestRepository.existsByTargetIdAndRequesterIdAndStatus(userId, targetId, "PENDING")) {
             throw new BusinessException(CODE_ALREADY, "你与「" + targetName + "」已有待处理的联系请求");
         }
+    }
+
+    private static boolean notRemoved(FamilyRelationship relationship) {
+        return !RelationshipVisibility.REMOVED.equals(relationship.getStatus());
     }
 
 

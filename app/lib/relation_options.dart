@@ -37,6 +37,7 @@ const List<RelationOption> relationOptions = [
   RelationOption('NIECE', '侄女'),
   RelationOption('FRIEND', '朋友'),
   RelationOption('OTHER', '其他'),
+  RelationOption('FAMILY', '家人'),
 ];
 
 /// 主动建立联系沿用同一套具体称谓
@@ -94,6 +95,7 @@ const Map<String, String> _inverseSuggestions = {
   'NIECE': 'UNCLE_PATERNAL_ELDER',
   'FRIEND': 'FRIEND',
   'OTHER': 'OTHER',
+  'FAMILY': 'FAMILY',
 };
 
 String? suggestedInverse(String code) => _inverseSuggestions[code];

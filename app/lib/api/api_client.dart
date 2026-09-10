@@ -135,12 +135,17 @@ class ApiClient {
   Future<ClaimResult> claimInvite(
     String token,
     String code,
-    String relation,
-    String inverseRelation,
+    String relation, [
+    String? inverseRelation,
+  ]
   ) async {
     final data = await _post(
       '/api/v1/invites/claim',
-      {'code': code, 'relation': relation, 'inverseRelation': inverseRelation},
+      {
+        'code': code,
+        'relation': relation,
+        'inverseRelation': ?inverseRelation,
+      },
       token: token,
     );
     return ClaimResult.fromJson(data as Map<String, dynamic>);
@@ -214,6 +219,48 @@ class ApiClient {
       headers: _headers(token),
     );
     _decode(response);
+  }
+
+  Future<RelationGraph> relationGraph(String token, {bool includePending = false}) async {
+    final data = await _get(
+      '/api/v1/connections/graph?includePending=$includePending',
+      token: token,
+    );
+    return RelationGraph.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<void> confirmRelationship(String token, int relationshipId, String relation) async {
+    await _post(
+      '/api/v1/connections/relationships/$relationshipId/confirm',
+      {'relation': relation},
+      token: token,
+    );
+  }
+
+  Future<void> rejectRelationship(String token, int relationshipId) async {
+    await _post(
+      '/api/v1/connections/relationships/$relationshipId/reject',
+      const {},
+      token: token,
+    );
+  }
+
+  Future<NotificationList> messages(String token) async {
+    final data = await _get('/api/v1/messages', token: token);
+    return NotificationList.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<void> confirmMessage(String token, int messageId, String relation) async {
+    await _post('/api/v1/messages/$messageId/confirm', {'relation': relation}, token: token);
+  }
+
+  Future<void> rejectMessage(String token, int messageId) async {
+    await _post('/api/v1/messages/$messageId/reject', const {}, token: token);
+  }
+
+  Future<int> confirmAllMessages(String token) async {
+    final data = await _post('/api/v1/messages/confirm-all', const {}, token: token);
+    return ((data as Map<String, dynamic>)['confirmed'] as num?)?.toInt() ?? 0;
   }
 
   Future<void> acceptConnection(String token, int requestId, {String? inverseRelation}) async {

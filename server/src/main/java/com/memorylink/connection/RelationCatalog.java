@@ -21,8 +21,35 @@ public final class RelationCatalog {
             "IN_LAW_PARENT", "IN_LAW_GRANDPARENT",
             "AUNT_PATERNAL", "AUNT_MATERNAL",
             "UNCLE_PATERNAL_ELDER", "UNCLE_PATERNAL_YOUNGER", "UNCLE_MATERNAL",
-            "NEPHEW", "NIECE", "FRIEND", "OTHER"
+            "NEPHEW", "NIECE", "FRIEND", "OTHER", "FAMILY"
     );
+
+    /** 无法判断具体称谓时的兜底称呼：确认关系时可选"家人"，不强迫用户给出精确称谓。 */
+    public static final String FALLBACK = "FAMILY";
+
+    /** 确认关系时的系统建议称谓（仅建议，接收方可修改）。 */
+    public static final Map<String, String> SUGGESTIONS = Map.ofEntries(
+            Map.entry("SON", "FATHER"),
+            Map.entry("DAUGHTER", "FATHER"),
+            Map.entry("FATHER", "SON"),
+            Map.entry("MOTHER", "SON"),
+            Map.entry("GRANDSON", "GRANDFATHER_PATERNAL"),
+            Map.entry("GRANDDAUGHTER", "GRANDFATHER_PATERNAL"),
+            Map.entry("GRANDCHILD", "GRANDFATHER_PATERNAL"),
+            Map.entry("SPOUSE", "SPOUSE"),
+            Map.entry("OLDER_BROTHER", "YOUNGER_BROTHER"),
+            Map.entry("OLDER_SISTER", "YOUNGER_BROTHER"),
+            Map.entry("YOUNGER_BROTHER", "OLDER_BROTHER"),
+            Map.entry("YOUNGER_SISTER", "OLDER_BROTHER"),
+            Map.entry("SIBLING", "OLDER_BROTHER"),
+            Map.entry("FRIEND", "FRIEND"),
+            Map.entry("OTHER", "FAMILY"),
+            Map.entry("FAMILY", "FAMILY")
+    );
+
+    public static String suggest(String code) {
+        return code == null ? null : SUGGESTIONS.get(normalizeLegacy(code));
+    }
 
     /** 旧数据/无法判定性别时的兜底映射。 */
     public static final Map<String, String> LEGACY_GENERIC = Map.of(

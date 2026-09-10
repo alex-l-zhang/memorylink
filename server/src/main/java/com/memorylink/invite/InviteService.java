@@ -9,9 +9,9 @@ import com.memorylink.family.FamilyMember;
 import com.memorylink.family.FamilyMemberRepository;
 import com.memorylink.family.FamilyService;
 import com.memorylink.family.MemberProfileService;
-import com.memorylink.connection.FamilyRelationship;
 import com.memorylink.connection.FamilyRelationshipRepository;
 import com.memorylink.connection.RelationCatalog;
+import com.memorylink.notification.NotificationService;
 import com.memorylink.invite.dto.ClaimResponse;
 import com.memorylink.invite.dto.InviteKeyResponse;
 import com.memorylink.invite.dto.InviteInfoResponse;
@@ -39,6 +39,7 @@ public class InviteService {
     private final com.memorylink.user.UserRepository userRepository;
     private final MemberProfileService memberProfileService;
     private final FamilyRelationshipRepository relationshipRepository;
+    private final NotificationService notificationService;
 
     private final InviteKeyRepository inviteKeyRepository;
     private final LovedOneRepository lovedOneRepository;
@@ -54,7 +55,8 @@ public class InviteService {
                          AuditLogRepository auditLogRepository,
                          com.memorylink.user.UserRepository userRepository,
                          MemberProfileService memberProfileService,
-                         FamilyRelationshipRepository relationshipRepository) {
+                         FamilyRelationshipRepository relationshipRepository,
+                         NotificationService notificationService) {
         this.inviteKeyRepository = inviteKeyRepository;
         this.lovedOneRepository = lovedOneRepository;
         this.familyService = familyService;
@@ -63,6 +65,7 @@ public class InviteService {
         this.userRepository = userRepository;
         this.memberProfileService = memberProfileService;
         this.relationshipRepository = relationshipRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -132,21 +135,10 @@ public class InviteService {
         familyMemberRepository.save(member);
         memberProfileService.ensureSelfProfile(key.getCreatedBy());
         memberProfileService.ensureSelfProfile(userId);
-        boolean relationshipExists = relationshipRepository
-                .findByUserAIdAndUserBId(key.getCreatedBy(), userId)
-                .or(() -> relationshipRepository.findByUserBIdAndUserAId(key.getCreatedBy(), userId))
-                .isPresent();
-        if (!relationshipExists) {
-            FamilyRelationship relationship = new FamilyRelationship();
-            relationship.setUserAId(key.getCreatedBy());
-            relationship.setUserBId(userId);
-            relationship.setRelationAToB(RelationCatalog.normalizeLegacy(targetRelation));
-            relationship.setRelationBToA(targetInverse == null
-                    ? RelationCatalog.normalizeLegacy(inverseGeneric(targetRelation))
-                    : RelationCatalog.normalizeLegacy(targetInverse));
-            relationship.setStatus("ACTIVE");
-            relationshipRepository.save(relationship);
-        }
+        // 关系自动建立：邀请人这一侧由新人的自述确定（"我是你的 X" → 邀请人眼中新人是 X）；
+        // 新人自己那一侧不替 TA 决定——留待本人在消息中心/关系图谱确认（可改称谓）。
+        notificationService.fanoutOnJoin(lovedOne.getFamilyId(), userId, key.getCreatedBy(),
+                targetRelation, targetInverse);
 
         key.setUsedCount(key.getUsedCount() + 1);
         if (key.getUsedCount() >= key.getMaxUses()) {
@@ -209,16 +201,6 @@ public class InviteService {
 
     private String normalize(String code) {
         return code == null ? "" : code.replaceAll("[^A-Za-z0-9]", "").toUpperCase();
-    }
-
-    private String inverseGeneric(String relation) {
-        return switch (relation) {
-            case "PARENT" -> "CHILD";
-            case "CHILD" -> "PARENT";
-            case "GRANDPARENT" -> "GRANDCHILD";
-            case "GRANDCHILD" -> "GRANDPARENT";
-            default -> relation;
-        };
     }
 
     private String maskPhone(String phone) {

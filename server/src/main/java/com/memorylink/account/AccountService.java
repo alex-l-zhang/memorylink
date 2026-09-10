@@ -15,7 +15,10 @@ import com.memorylink.family.FamilyMemberRepository;
 import com.memorylink.family.FamilyRepository;
 import com.memorylink.invite.InviteKeyRepository;
 import com.memorylink.connection.ConnectionRequestRepository;
+import com.memorylink.connection.FamilyRelationship;
 import com.memorylink.connection.FamilyRelationshipRepository;
+import com.memorylink.notification.NotificationRepository;
+import java.util.ArrayList;
 import com.memorylink.qa.Conversation;
 import com.memorylink.qa.ConversationRepository;
 import com.memorylink.storage.MediaStorage;
@@ -47,6 +50,7 @@ public class AccountService {
     private final com.memorylink.audit.AuditService auditService;
     private final ConnectionRequestRepository connectionRequestRepository;
     private final FamilyRelationshipRepository relationshipRepository;
+    private final NotificationRepository notificationRepository;
 
     public AccountService(UserRepository userRepository,
                           FamilyRepository familyRepository,
@@ -61,7 +65,8 @@ public class AccountService {
                           PasswordEncoder passwordEncoder,
                           com.memorylink.audit.AuditService auditService,
                           ConnectionRequestRepository connectionRequestRepository,
-                          FamilyRelationshipRepository relationshipRepository) {
+                          FamilyRelationshipRepository relationshipRepository,
+                          NotificationRepository notificationRepository) {
         this.userRepository = userRepository;
         this.familyRepository = familyRepository;
         this.familyMemberRepository = familyMemberRepository;
@@ -76,6 +81,7 @@ public class AccountService {
         this.auditService = auditService;
         this.connectionRequestRepository = connectionRequestRepository;
         this.relationshipRepository = relationshipRepository;
+        this.notificationRepository = notificationRepository;
     }
 
     @Transactional(readOnly = true)
@@ -125,6 +131,14 @@ public class AccountService {
         familyMemberRepository.deleteAll(familyMemberRepository.findByUserId(uid));
         connectionRequestRepository.deleteAll(connectionRequestRepository.findByRequesterId(uid));
         connectionRequestRepository.deleteAll(connectionRequestRepository.findByTargetId(uid));
+        List<FamilyRelationship> myRelationships = new ArrayList<>();
+        myRelationships.addAll(relationshipRepository.findByUserAId(uid));
+        myRelationships.addAll(relationshipRepository.findByUserBId(uid));
+        if (!myRelationships.isEmpty()) {
+            notificationRepository.deleteByRelationshipIdIn(
+                    myRelationships.stream().map(FamilyRelationship::getId).toList());
+        }
+        notificationRepository.deleteByRecipientIdOrOtherUserId(uid, uid);
         relationshipRepository.deleteAll(relationshipRepository.findByUserAId(uid));
         relationshipRepository.deleteAll(relationshipRepository.findByUserBId(uid));
         for (LovedOne person : lovedOneRepository.findByUserId(uid)) {

@@ -9,6 +9,8 @@ import 'login_screen.dart';
 import 'my_oral_screen.dart';
 import 'my_assets_screen.dart';
 import 'connections_screen.dart';
+import 'family_graph_screen.dart';
+import 'message_center_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final ApiClient api;
@@ -27,12 +29,44 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loading = true;
   String? _error;
   bool _profileLoaded = false;
+  int _unreadMessages = 0;
 
   @override
   void initState() {
     super.initState();
     _reload();
     _loadProfile();
+    _loadUnread();
+  }
+
+  Future<void> _loadUnread() async {
+    try {
+      final messages = await widget.api.messages(widget.token);
+      if (!mounted) return;
+      setState(() => _unreadMessages = messages.unread);
+    } catch (_) {
+      // 未读角标失败不影响主流程
+    }
+  }
+
+  Future<void> _openMessages() async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => MessageCenterScreen(api: widget.api, token: widget.token),
+      ),
+    );
+    if (!mounted) return;
+    await _loadUnread();
+    if (changed == true) await _reload();
+  }
+
+  Future<void> _openGraph() async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => FamilyGraphScreen(api: widget.api, token: widget.token),
+      ),
+    );
+    if (mounted) await _reload();
   }
 
   Future<void> _loadProfile() async {
@@ -125,6 +159,15 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('记忆档案'),
         actions: [
           IconButton(
+            tooltip: '消息中心',
+            icon: Badge(
+              isLabelVisible: _unreadMessages > 0,
+              label: Text('$_unreadMessages'),
+              child: const Icon(Icons.notifications_outlined),
+            ),
+            onPressed: _openMessages,
+          ),
+          IconButton(
             tooltip: '我的素材与记录',
             icon: const Icon(Icons.photo_library_outlined),
             onPressed: () => Navigator.of(context).push(
@@ -141,6 +184,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 builder: (_) => ConnectionsScreen(api: widget.api, token: widget.token),
               ),
             ),
+          ),
+          IconButton(
+            tooltip: '家族关系图谱',
+            icon: const Icon(Icons.hub_outlined),
+            onPressed: _openGraph,
           ),
           IconButton(
             tooltip: '我的讲述',
@@ -207,7 +255,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     if (claimed == true && mounted) {
       await _reload();
-      _showSnack('已加入纪念馆');
+      await _loadUnread();
+      _showSnack('已加入纪念馆，请确认与家人的关系');
+      await _openMessages();
     }
   }
 
@@ -531,7 +581,6 @@ class _ClaimDialog extends StatefulWidget {
 class _ClaimDialogState extends State<_ClaimDialog> {
   final _code = TextEditingController();
   String _relation = 'SON';
-  String _inverseRelation = 'FATHER';
   bool _submitting = false;
   bool _querying = false;
   InviteInfo? _info;
@@ -549,11 +598,11 @@ class _ClaimDialogState extends State<_ClaimDialog> {
       _error = null;
     });
     try {
+      // 只提交"我是邀请人的谁"；邀请人是我的谁，由本人稍后在消息中心确认（可改称谓）
       await widget.api.claimInvite(
         widget.token,
         _code.text.trim(),
         _relation,
-        _inverseRelation,
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -653,14 +702,14 @@ class _ClaimDialogState extends State<_ClaimDialog> {
                 if (value != null) {
                   setState(() {
                     _relation = value;
-                    _inverseRelation = suggestedInverse(value) ?? _inverseRelation;
                   });
                 }
               },
             ),
             const SizedBox(height: 12),
             Text(
-              '将提交：我是邀请人的${relationLabel(_relation)}',
+              '将提交：我是邀请人的${relationLabel(_relation)}\n'
+              '加入后请到消息中心确认"邀请人是我的谁"，称谓可自行修改。',
               style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ],

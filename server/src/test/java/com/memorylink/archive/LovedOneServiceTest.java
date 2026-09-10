@@ -18,6 +18,8 @@ import com.memorylink.family.Family;
 import com.memorylink.family.FamilyService;
 import com.memorylink.storage.MediaStorage;
 import com.memorylink.connection.FamilyRelationshipRepository;
+import com.memorylink.user.User;
+import com.memorylink.user.UserRepository;
 import com.memorylink.family.FamilyMember;
 import com.memorylink.family.MemberProfileService;
 import java.io.ByteArrayInputStream;
@@ -46,13 +48,15 @@ class LovedOneServiceTest {
     private FamilyRelationshipRepository relationshipRepository;
     @Mock
     private MemberProfileService memberProfileService;
+    @Mock
+    private UserRepository userRepository;
 
     private LovedOneService service;
 
     @BeforeEach
     void setUp() {
         service = new LovedOneService(lovedOneRepository, mediaFileRepository, familyService,
-                mediaStorage, relationshipRepository, memberProfileService);
+                mediaStorage, relationshipRepository, memberProfileService, userRepository);
     }
 
     @Test
@@ -74,6 +78,26 @@ class LovedOneServiceTest {
         assertThat(response.id()).isEqualTo(1L);
         assertThat(response.familyId()).isEqualTo(10L);
         assertThat(response.name()).isEqualTo("张爷爷");
+    }
+
+    @Test
+    void createWithOwnNameBindsSelfProfile() {
+        Family family = new Family();
+        family.setId(10L);
+        when(familyService.getOrCreateDefaultFamily(2L, "13900000001")).thenReturn(family);
+        User me = new User();
+        me.setId(2L);
+        me.setName("李大山");
+        when(userRepository.findById(2L)).thenReturn(Optional.of(me));
+        when(lovedOneRepository.findFirstByUserIdOrderByIdAsc(2L)).thenReturn(Optional.empty());
+        when(lovedOneRepository.save(any(LovedOne.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        LovedOneResponse response = service.create(2L, "13900000001",
+                new LovedOneRequest("李大山", null, null, null, null));
+
+        assertThat(response.userId()).isEqualTo(2L);
+        assertThat(response.isDeceased()).isFalse();
     }
 
     @Test

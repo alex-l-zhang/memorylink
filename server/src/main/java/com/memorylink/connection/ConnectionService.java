@@ -241,20 +241,17 @@ public class ConnectionService {
         if (!relationship.getUserAId().equals(userId) && !relationship.getUserBId().equals(userId)) {
             throw new BusinessException(CODE_FORBIDDEN, "无权解除该关系");
         }
-        Long requesterId = relationship.getUserAId();
-        Long targetId = relationship.getUserBId();
-        var familyOpt = familyRepository.findFirstByCreatorIdOrderByIdAsc(requesterId);
-        if (familyOpt.isPresent()) {
-            Long familyId = familyOpt.get().getId();
-            familyMemberRepository.findByFamilyIdAndUserId(familyId, targetId)
-                    .filter(m -> "CONNECTION_REQUEST".equals(m.getRelationSource()))
-                    .ifPresent(familyMemberRepository::delete);
-            lovedOneRepository.findFirstByFamilyIdAndUserId(familyId, targetId)
-                    .ifPresent(lovedOneRepository::delete);
-        }
+        Long userAId = relationship.getUserAId();
+        Long userBId = relationship.getUserBId();
+        Long targetId = userBId.equals(userId) ? userAId : userBId;
+        // 解除关系后，清理由这段关系产生的家族成员关系与成员卡（双向）
+        dropDerivedMembership(userAId, userBId);
+        dropDerivedMembership(userBId, userAId);
         relationship.setStatus("REMOVED");
         relationshipRepository.save(relationship);
-        requestRepository.findFirstByRequesterIdAndTargetIdOrderByIdDesc(requesterId, targetId)
+        requestRepository.findFirstByRequesterIdAndTargetIdOrderByIdDesc(userId, targetId)
+                .or(() -> requestRepository
+                        .findFirstByTargetIdAndRequesterIdOrderByIdDesc(userId, targetId))
                 .ifPresent(request -> {
                     request.setStatus("REMOVED");
                     requestRepository.save(request);
@@ -264,7 +261,38 @@ public class ConnectionService {
             memberProfileService.ensureSelfProfile(targetId);
         }
         auditService.log("USER", userId, "RELATIONSHIP_REMOVED", "relationship:" + relationshipId,
-                Map.of("otherUserId", targetId.equals(userId) ? requesterId : targetId));
+                Map.of("otherUserId", targetId));
+    }
+
+    /**
+     * 解除关系时清理"由关系产生"的成员关系（邀请码 / 建立联系 / 关系确认），
+     * 只删除 owner 与 other 共同所在的家族里的记录，避免误删用户自己创建家族的成员身份。
+     */
+    private void dropDerivedMembership(Long ownerId, Long otherId) {
+        if (ownerId == null || otherId == null) {
+            return;
+        }
+        familyRepository.findFirstByCreatorIdOrderByIdAsc(ownerId).ifPresent(family -> {
+            familyMemberRepository.findByFamilyIdAndUserId(family.getId(), otherId)
+                    .filter(m -> isDerivedSource(m.getRelationSource()))
+                    .ifPresent(familyMemberRepository::delete);
+            lovedOneRepository.findFirstByFamilyIdAndUserId(family.getId(), otherId)
+                    .ifPresent(lovedOneRepository::delete);
+        });
+        for (com.memorylink.family.FamilyMember membership
+                : familyMemberRepository.findByUserId(otherId)) {
+            if (!isDerivedSource(membership.getRelationSource())) {
+                continue;
+            }
+            if (familyMemberRepository.findByFamilyIdAndUserId(membership.getFamilyId(), ownerId)
+                    .isPresent()) {
+                familyMemberRepository.delete(membership);
+            }
+        }
+    }
+
+    private static boolean isDerivedSource(String relationSource) {
+        return "CONNECTION_REQUEST".equals(relationSource) || "RELATION_CONFIRM".equals(relationSource);
     }
 
     @Transactional

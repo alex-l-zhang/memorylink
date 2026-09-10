@@ -8,14 +8,20 @@ import com.memorylink.connection.RelationCatalog;
 import com.memorylink.connection.RelationshipVisibility;
 import com.memorylink.family.FamilyMember;
 import com.memorylink.family.FamilyMemberRepository;
+import com.memorylink.archive.LovedOne;
+import com.memorylink.archive.LovedOneRepository;
+import com.memorylink.family.MemberProfileService;
 import com.memorylink.notification.dto.NotificationListResponse;
 import com.memorylink.notification.dto.NotificationResponse;
 import com.memorylink.user.User;
 import com.memorylink.user.UserRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,17 +39,23 @@ public class NotificationService {
     private final FamilyMemberRepository familyMemberRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
+    private final LovedOneRepository lovedOneRepository;
+    private final MemberProfileService memberProfileService;
 
     public NotificationService(NotificationRepository notificationRepository,
                                FamilyRelationshipRepository relationshipRepository,
                                FamilyMemberRepository familyMemberRepository,
                                UserRepository userRepository,
-                               AuditService auditService) {
+                               AuditService auditService,
+                               LovedOneRepository lovedOneRepository,
+                               MemberProfileService memberProfileService) {
         this.notificationRepository = notificationRepository;
         this.relationshipRepository = relationshipRepository;
         this.familyMemberRepository = familyMemberRepository;
         this.userRepository = userRepository;
         this.auditService = auditService;
+        this.lovedOneRepository = lovedOneRepository;
+        this.memberProfileService = memberProfileService;
     }
 
     @Transactional(readOnly = true)
@@ -116,33 +128,36 @@ public class NotificationService {
     }
 
     /**
-     * 成员入族后的扇出：为新人 × 每位现有成员建立（或恢复）关系，并给尚未确认的一侧发站内消息。
+     * 成员入族后的扇出：让"新人的家族圈子"与"已知对象的家族圈子"互相认识。
      *
-     * @param familyId             新加入的家族
-     * @param newcomerId           新人（自己）
-     * @param knownPeerId          已知关系的对象（邀请码创建人 / 同意联系请求的发起人），可为 null
+     * <p>家族关系是一张网而不是孤岛：新人（被加入某家族的一方）进来后，
+     * 既要让新人与对方的家人认识，也要让对方的家人与新人的家人认识；
+     * 否则"张力把女儿介绍进来"时，张力自己家族里的其他成员（如张耘嫣）收不到任何消息。
+     *
+     * @param familyId             本次加入的家族
+     * @param newcomerId           新加入该家族的人
+     * @param knownPeerId          已知关系的对象（邀请码创建人 / 联系请求的发起人），可为 null
      * @param newcomerDeclaration  新人对 knownPeer 的自述："我是你的 X"（例如"我是你的女儿"）
      * @param newcomerSideOverride 新人自己对 knownPeer 的称谓（旧流程已收集时使用："你是我的 Y"），可为 null
      */
     @Transactional
     public void fanoutOnJoin(Long familyId, Long newcomerId, Long knownPeerId,
                              String newcomerDeclaration, String newcomerSideOverride) {
-        List<Long> memberIds = familyMemberRepository.findByFamilyId(familyId).stream()
-                .filter(m -> "ACTIVE".equals(m.getStatus()))
-                .map(FamilyMember::getUserId)
-                .distinct()
-                .toList();
         String declaration = blankToNull(newcomerDeclaration);
         String override = blankToNull(newcomerSideOverride);
-        for (Long memberId : memberIds) {
-            if (Objects.equals(memberId, newcomerId)) {
-                continue;
-            }
-            FamilyRelationship relationship = ensureRelationship(newcomerId, memberId);
-            boolean knownPeer = Objects.equals(memberId, knownPeerId);
-            if (knownPeer && declaration != null) {
+        Set<Long> newcomerCircle = circleOf(newcomerId, familyId);
+        Set<Long> peers = new LinkedHashSet<>(circleOf(knownPeerId, familyId));
+        peers.addAll(newcomerCircle);
+        peers.remove(newcomerId);
+        peers.remove(null);
+
+        // 一、新人与对方圈子里的每个人建立（或恢复）关系
+        for (Long peerId : peers) {
+            boolean anchor = Objects.equals(peerId, knownPeerId);
+            FamilyRelationship relationship = ensureRelationship(newcomerId, peerId);
+            if (anchor && declaration != null) {
                 // 老人这一侧是确定的：新人自述"我是你的 X" → 老人对新人就是 X
-                setSideState(relationship, memberId, RelationshipVisibility.ACTIVE,
+                setSideState(relationship, peerId, RelationshipVisibility.ACTIVE,
                         RelationCatalog.normalizeLegacy(declaration));
                 if (override != null) {
                     setSideState(relationship, newcomerId, RelationshipVisibility.ACTIVE,
@@ -150,10 +165,100 @@ public class NotificationService {
                 }
             }
             relationshipRepository.save(relationship);
-            notifyIfPending(relationship, memberId, null);
+            notifyIfPending(relationship, peerId, null);
             notifyIfPending(relationship, newcomerId,
-                    knownPeer ? RelationCatalog.suggest(declaration) : null);
+                    anchor ? RelationCatalog.suggest(declaration) : null);
         }
+
+        // 二、对方的家人与新人的家人互相认识（已知对象 × 新人的圈子）
+        if (knownPeerId != null) {
+            for (Long memberId : newcomerCircle) {
+                if (memberId.equals(newcomerId) || memberId.equals(knownPeerId)) {
+                    continue;
+                }
+                FamilyRelationship relationship = ensureRelationship(knownPeerId, memberId);
+                relationshipRepository.save(relationship);
+                notifyIfPending(relationship, knownPeerId, null);
+                notifyIfPending(relationship, memberId, null);
+            }
+        }
+    }
+
+    /** 某个人的"家族圈子"：自己 + 所在家族的全部成员 + 已确认关系的联系人。 */
+    private Set<Long> circleOf(Long userId, Long extraFamilyId) {
+        Set<Long> circle = new LinkedHashSet<>();
+        if (userId == null) {
+            return circle;
+        }
+        circle.add(userId);
+        Set<Long> familyIds = new LinkedHashSet<>();
+        if (extraFamilyId != null) {
+            familyIds.add(extraFamilyId);
+        }
+        familyMemberRepository.findByUserId(userId).stream()
+                .filter(m -> "ACTIVE".equals(m.getStatus()))
+                .map(FamilyMember::getFamilyId)
+                .forEach(familyIds::add);
+        for (Long familyId : familyIds) {
+            familyMemberRepository.findByFamilyId(familyId).stream()
+                    .filter(m -> "ACTIVE".equals(m.getStatus()))
+                    .map(FamilyMember::getUserId)
+                    .forEach(circle::add);
+        }
+        for (FamilyRelationship relationship : allRelationshipsOf(userId)) {
+            if (RelationshipVisibility.visibleTo(relationship, userId)) {
+                Long otherId = RelationshipVisibility.otherId(relationship, userId);
+                if (otherId != null) {
+                    circle.add(otherId);
+                }
+            }
+        }
+        return circle;
+    }
+
+    private List<FamilyRelationship> allRelationshipsOf(Long userId) {
+        List<FamilyRelationship> all = new java.util.ArrayList<>();
+        all.addAll(relationshipRepository.findByUserAId(userId));
+        all.addAll(relationshipRepository.findByUserBId(userId));
+        return all;
+    }
+
+    /**
+     * 确认关系后让双方真正进入同一个家族，否则确认了也看不到对方的档案。
+     * 仅当双方尚无共同家族时，补一条"由关系确认产生"的成员关系。
+     */
+    private void ensureSharedFamily(Long userId, Long otherUserId, String myRelation) {
+        if (otherUserId == null || sharesFamily(userId, otherUserId)) {
+            return;
+        }
+        memberProfileService.ensureSelfProfile(otherUserId);
+        Long targetFamilyId = lovedOneRepository.findFirstByUserIdOrderByIdAsc(otherUserId)
+                .map(LovedOne::getFamilyId)
+                .orElse(null);
+        if (targetFamilyId == null) {
+            return;
+        }
+        FamilyMember member = new FamilyMember();
+        member.setFamilyId(targetFamilyId);
+        member.setUserId(userId);
+        member.setRelation(myRelation);
+        member.setRole("VIEWER");
+        member.setStatus("ACTIVE");
+        member.setEvidenceStatus("SELF_DECLARED");
+        member.setRelationSource("RELATION_CONFIRM");
+        familyMemberRepository.save(member);
+        memberProfileService.ensureSelfProfile(userId);
+    }
+
+    private boolean sharesFamily(Long userId, Long otherUserId) {
+        Set<Long> mine = familyMemberRepository.findByUserId(userId).stream()
+                .filter(m -> "ACTIVE".equals(m.getStatus()))
+                .map(FamilyMember::getFamilyId)
+                .collect(Collectors.toSet());
+        return !mine.isEmpty() && familyMemberRepository.findByUserId(otherUserId).stream()
+                .filter(m -> "ACTIVE".equals(m.getStatus()))
+                .map(FamilyMember::getFamilyId)
+                .anyMatch(mine::contains);
     }
 
     private void confirmInternal(Long userId, Long notificationId, String relation) {
@@ -178,6 +283,7 @@ public class NotificationService {
         relationship.setStatus(RelationshipVisibility.ACTIVE);
         setSideState(relationship, userId, RelationshipVisibility.ACTIVE, relation);
         relationshipRepository.save(relationship);
+        ensureSharedFamily(userId, RelationshipVisibility.otherId(relationship, userId), relation);
     }
 
     /** 拒绝我这一侧的关系：保留技术关系，仅对我隐藏。 */

@@ -15,4 +15,8 @@ public interface ConnectionRequestRepository extends JpaRepository<ConnectionReq
     boolean existsByRequesterIdAndTargetIdAndStatus(Long requesterId, Long targetId, String status);
 
     boolean existsByTargetIdAndRequesterIdAndStatus(Long targetId, Long requesterId, String status);
+
+    List<ConnectionRequest> findByRequesterId(Long requesterId);
+
+    List<ConnectionRequest> findByTargetId(Long targetId);
 }

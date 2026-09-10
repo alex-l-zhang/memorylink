@@ -14,6 +14,8 @@ import com.memorylink.family.FamilyMember;
 import com.memorylink.family.FamilyMemberRepository;
 import com.memorylink.family.FamilyRepository;
 import com.memorylink.invite.InviteKeyRepository;
+import com.memorylink.connection.ConnectionRequestRepository;
+import com.memorylink.connection.FamilyRelationshipRepository;
 import com.memorylink.qa.Conversation;
 import com.memorylink.qa.ConversationRepository;
 import com.memorylink.storage.MediaStorage;
@@ -43,6 +45,8 @@ public class AccountService {
     private final MediaStorage mediaStorage;
     private final PasswordEncoder passwordEncoder;
     private final com.memorylink.audit.AuditService auditService;
+    private final ConnectionRequestRepository connectionRequestRepository;
+    private final FamilyRelationshipRepository relationshipRepository;
 
     public AccountService(UserRepository userRepository,
                           FamilyRepository familyRepository,
@@ -55,7 +59,9 @@ public class AccountService {
                           InviteKeyRepository inviteKeyRepository,
                           MediaStorage mediaStorage,
                           PasswordEncoder passwordEncoder,
-                          com.memorylink.audit.AuditService auditService) {
+                          com.memorylink.audit.AuditService auditService,
+                          ConnectionRequestRepository connectionRequestRepository,
+                          FamilyRelationshipRepository relationshipRepository) {
         this.userRepository = userRepository;
         this.familyRepository = familyRepository;
         this.familyMemberRepository = familyMemberRepository;
@@ -68,6 +74,8 @@ public class AccountService {
         this.mediaStorage = mediaStorage;
         this.passwordEncoder = passwordEncoder;
         this.auditService = auditService;
+        this.connectionRequestRepository = connectionRequestRepository;
+        this.relationshipRepository = relationshipRepository;
     }
 
     @Transactional(readOnly = true)
@@ -115,6 +123,10 @@ public class AccountService {
             }
         }
         familyMemberRepository.deleteAll(familyMemberRepository.findByUserId(uid));
+        connectionRequestRepository.deleteAll(connectionRequestRepository.findByRequesterId(uid));
+        connectionRequestRepository.deleteAll(connectionRequestRepository.findByTargetId(uid));
+        relationshipRepository.deleteAll(relationshipRepository.findByUserAId(uid));
+        relationshipRepository.deleteAll(relationshipRepository.findByUserBId(uid));
         for (LovedOne person : lovedOneRepository.findByUserId(uid)) {
             purgePerson(person.getId());
         }

@@ -104,4 +104,25 @@ class ConnectionServiceTest {
         verify(familyMemberRepository).save(any());
         assertThat(request.getStatus()).isEqualTo("ACCEPTED");
     }
+
+    @Test
+    void outgoingReturnsStatusAndTargetName() {
+        ConnectionRequest request = new ConnectionRequest();
+        request.setId(11L);
+        request.setRequesterId(1L);
+        request.setTargetId(2L);
+        request.setRelation("SON");
+        request.setInverseRelation("FATHER");
+        request.setStatus("ACCEPTED");
+        when(requestRepository.findByRequesterIdOrderByCreatedAtDesc(1L))
+                .thenReturn(List.of(request));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user(2L, "张三", null, null)));
+
+        var history = service.outgoing(1L);
+
+        assertThat(history).hasSize(1);
+        assertThat(history.get(0).targetName()).isEqualTo("张三");
+        assertThat(history.get(0).status()).isEqualTo("ACCEPTED");
+        assertThat(history.get(0).relation()).isEqualTo("SON");
+    }
 }

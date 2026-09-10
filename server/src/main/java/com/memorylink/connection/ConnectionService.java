@@ -3,6 +3,7 @@ package com.memorylink.connection;
 import com.memorylink.audit.AuditService;
 import com.memorylink.common.BusinessException;
 import com.memorylink.connection.dto.ConnectionRequestResponse;
+import com.memorylink.connection.dto.ConnectionHistoryResponse;
 import com.memorylink.connection.dto.UserCandidateResponse;
 import com.memorylink.family.Family;
 import com.memorylink.family.FamilyMember;
@@ -107,6 +108,25 @@ public class ConnectionService {
     public List<ConnectionRequestResponse> incoming(Long userId) {
         return requestRepository.findByTargetIdAndStatusOrderByCreatedAtDesc(userId, "PENDING").stream()
                 .map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ConnectionHistoryResponse> outgoing(Long userId) {
+        return requestRepository.findByRequesterIdOrderByCreatedAtDesc(userId).stream()
+                .map(request -> {
+                    String targetName = userRepository.findById(request.getTargetId())
+                            .map(User::getName).orElse("已注销用户");
+                    return new ConnectionHistoryResponse(
+                            request.getId(),
+                            request.getTargetId(),
+                            targetName,
+                            request.getRelation(),
+                            request.getInverseRelation(),
+                            request.getStatus(),
+                            request.getCreatedAt(),
+                            request.getRespondedAt());
+                })
+                .toList();
     }
 
     @Transactional

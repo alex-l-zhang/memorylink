@@ -187,6 +187,13 @@ class ApiClient {
         .toList();
   }
 
+  Future<List<ConnectionHistoryItem>> outgoingConnections(String token) async {
+    final data = await _get('/api/v1/connections/requests/outgoing', token: token);
+    return (data as List)
+        .map((e) => ConnectionHistoryItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<void> acceptConnection(String token, int requestId) async {
     await _post('/api/v1/connections/requests/$requestId/accept', const {}, token: token);
   }

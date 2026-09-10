@@ -13,19 +13,21 @@ class ConnectionsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('建立联系'),
           bottom: const TabBar(tabs: [
             Tab(text: '找人发起'),
             Tab(text: '收到的请求'),
+            Tab(text: '我发起的'),
           ]),
         ),
         body: TabBarView(
           children: [
             _SearchTab(api: api, token: token),
             _IncomingTab(api: api, token: token),
+            _OutgoingTab(api: api, token: token),
           ],
         ),
       ),
@@ -36,11 +38,11 @@ class ConnectionsScreen extends StatelessWidget {
 String _birthText(int? year, int? month) =>
     year == null || month == null ? '出生信息未填写' : '$year 年 $month 月';
 
-String _relationLabel(String code) => connectionRelationOptions
+String _relationLabel(String? code) => connectionRelationOptions
         .where((o) => o.code == code)
         .map((o) => o.label)
         .firstOrNull ??
-    code;
+    relationLabel(code);
 
 class _SearchTab extends StatefulWidget {
   final ApiClient api;
@@ -315,6 +317,125 @@ class _IncomingTabState extends State<_IncomingTab> {
                     ],
                   ),
                 ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _OutgoingTab extends StatefulWidget {
+  final ApiClient api;
+  final String token;
+
+  const _OutgoingTab({required this.api, required this.token});
+
+  @override
+  State<_OutgoingTab> createState() => _OutgoingTabState();
+}
+
+class _OutgoingTabState extends State<_OutgoingTab> {
+  List<ConnectionHistoryItem> _items = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  Future<void> _reload() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final items = await widget.api.outgoingConnections(widget.token);
+      if (!mounted) return;
+      setState(() => _items = items);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = '加载失败，请稍后重试');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'ACCEPTED':
+        return '已同意';
+      case 'REJECTED':
+        return '已拒绝';
+      default:
+        return '等待对方同意';
+    }
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'ACCEPTED':
+        return Colors.green;
+      case 'REJECTED':
+        return Colors.redAccent;
+      default:
+        return Colors.orange;
+    }
+  }
+
+  String _time(String? iso) {
+    if (iso == null || iso.isEmpty) return '';
+    final t = DateTime.tryParse(iso)?.toLocal();
+    if (t == null) return '';
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${t.year}-${two(t.month)}-${two(t.day)} ${two(t.hour)}:${two(t.minute)}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_error!),
+            const SizedBox(height: 12),
+            FilledButton(onPressed: _reload, child: const Text('重试')),
+          ],
+        ),
+      );
+    }
+    if (_items.isEmpty) {
+      return const Center(child: Text('还没有发起过联系请求'));
+    }
+    return RefreshIndicator(
+      onRefresh: _reload,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(12),
+        itemCount: _items.length,
+        itemBuilder: (context, index) {
+          final item = _items[index];
+          final accepted = item.status == 'ACCEPTED';
+          return Card(
+            child: ListTile(
+              leading: Icon(
+                accepted
+                    ? Icons.check_circle
+                    : item.status == 'REJECTED'
+                        ? Icons.cancel
+                        : Icons.hourglass_top,
+                color: _statusColor(item.status),
+              ),
+              title: Text('${item.targetName} · ${_statusLabel(item.status)}'),
+              subtitle: Text(
+                '我是你的${_relationLabel(item.relation)}'
+                '${accepted && item.inverseRelation != null ? ' · 对方是我的${_relationLabel(item.inverseRelation)}' : ''}'
+                '\n发起时间：${_time(item.createdAt)}',
               ),
             ),
           );

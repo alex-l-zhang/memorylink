@@ -282,6 +282,39 @@ class ConnectionRequestItem {
       );
 }
 
+class ConnectionHistoryItem {
+  final int id;
+  final int targetId;
+  final String targetName;
+  final String relation;
+  final String? inverseRelation;
+  final String status;
+  final String? createdAt;
+  final String? respondedAt;
+
+  ConnectionHistoryItem({
+    required this.id,
+    required this.targetId,
+    required this.targetName,
+    required this.relation,
+    this.inverseRelation,
+    required this.status,
+    this.createdAt,
+    this.respondedAt,
+  });
+
+  factory ConnectionHistoryItem.fromJson(Map<String, dynamic> json) => ConnectionHistoryItem(
+        id: (json['id'] as num).toInt(),
+        targetId: (json['targetId'] as num).toInt(),
+        targetName: json['targetName'] as String? ?? '',
+        relation: json['relation'] as String? ?? '',
+        inverseRelation: json['inverseRelation'] as String?,
+        status: json['status'] as String? ?? '',
+        createdAt: json['createdAt'] as String?,
+        respondedAt: json['respondedAt'] as String?,
+      );
+}
+
 class ChatResult {
   final int conversationId;
   final String answer;

@@ -2,6 +2,7 @@ package com.memorylink.connection;
 
 import com.memorylink.common.ApiResponse;
 import com.memorylink.connection.dto.ConnectionRequestResponse;
+import com.memorylink.connection.dto.ConnectionHistoryResponse;
 import com.memorylink.connection.dto.SendConnectionRequest;
 import com.memorylink.connection.dto.UserCandidateResponse;
 import com.memorylink.security.SecurityUtils;
@@ -42,6 +43,11 @@ public class ConnectionController {
     @GetMapping("/requests/incoming")
     public ApiResponse<List<ConnectionRequestResponse>> incoming() {
         return ApiResponse.ok(connectionService.incoming(SecurityUtils.currentUser().userId()));
+    }
+
+    @GetMapping("/requests/outgoing")
+    public ApiResponse<List<ConnectionHistoryResponse>> outgoing() {
+        return ApiResponse.ok(connectionService.outgoing(SecurityUtils.currentUser().userId()));
     }
 
     @PostMapping("/requests/{requestId}/accept")

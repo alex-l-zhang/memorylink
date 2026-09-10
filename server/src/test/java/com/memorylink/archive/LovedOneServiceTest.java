@@ -18,8 +18,10 @@ import com.memorylink.family.Family;
 import com.memorylink.family.FamilyService;
 import com.memorylink.storage.MediaStorage;
 import com.memorylink.connection.FamilyRelationshipRepository;
+import com.memorylink.family.FamilyMember;
 import java.io.ByteArrayInputStream;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -197,5 +199,37 @@ class LovedOneServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("素材不存在");
         verifyNoInteractions(mediaStorage);
+    }
+
+    @Test
+    void listDeduplicatesMultipleCardsOfSameUser() {
+        FamilyMember owner = new FamilyMember();
+        owner.setFamilyId(9L);
+        owner.setUserId(1L);
+        owner.setRole("OWNER");
+        owner.setStatus("ACTIVE");
+        FamilyMember viewer = new FamilyMember();
+        viewer.setFamilyId(10L);
+        viewer.setUserId(1L);
+        viewer.setRole("VIEWER");
+        viewer.setStatus("ACTIVE");
+        when(familyService.membershipsOf(1L)).thenReturn(List.of(owner, viewer));
+
+        LovedOne cardA = new LovedOne();
+        cardA.setId(1L);
+        cardA.setFamilyId(9L);
+        cardA.setUserId(1L);
+        cardA.setName("测试用户");
+        LovedOne cardB = new LovedOne();
+        cardB.setId(2L);
+        cardB.setFamilyId(10L);
+        cardB.setUserId(1L);
+        cardB.setName("测试用户");
+        when(lovedOneRepository.findByFamilyIdInOrderByCreatedAtDesc(any())).thenReturn(List.of(cardB, cardA));
+
+        List<LovedOneResponse> result = service.list(1L);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).familyId()).isEqualTo(9L);
     }
 }

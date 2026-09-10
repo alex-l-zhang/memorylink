@@ -10,10 +10,14 @@ import com.memorylink.family.FamilyService;
 import com.memorylink.storage.MediaStorage;
 import com.memorylink.connection.FamilyRelationshipRepository;
 import java.util.Collection;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.time.LocalDate;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -65,15 +69,46 @@ public class LovedOneService {
 
     @Transactional(readOnly = true)
     public List<LovedOneResponse> list(Long userId) {
-        List<Long> familyIds = familyService.membershipsOf(userId).stream()
+        List<FamilyMember> memberships = familyService.membershipsOf(userId).stream()
                 .filter(m -> "ACTIVE".equals(m.getStatus()))
-                .map(FamilyMember::getFamilyId)
                 .toList();
+        List<Long> familyIds = memberships.stream().map(FamilyMember::getFamilyId).toList();
         if (familyIds.isEmpty()) {
             return List.of();
         }
-        return lovedOneRepository.findByFamilyIdInOrderByCreatedAtDesc(familyIds)
-                .stream().map(person -> toResponse(person, relationToMe(userId, person))).toList();
+        Map<Long, String> roleByFamily = memberships.stream()
+                .collect(Collectors.toMap(FamilyMember::getFamilyId, FamilyMember::getRole, (a, b) -> a));
+        List<LovedOne> persons = lovedOneRepository.findByFamilyIdInOrderByCreatedAtDesc(familyIds);
+        List<LovedOne> result = new ArrayList<>();
+        Map<Long, LovedOne> chosenByUser = new LinkedHashMap<>();
+        for (LovedOne person : persons) {
+            Long personUserId = person.getUserId();
+            if (personUserId == null) {
+                result.add(person);
+                continue;
+            }
+            LovedOne existing = chosenByUser.get(personUserId);
+            if (existing == null) {
+                chosenByUser.put(personUserId, person);
+                result.add(person);
+            } else if (score(person, userId, roleByFamily) > score(existing, userId, roleByFamily)) {
+                int index = result.indexOf(existing);
+                if (index >= 0) {
+                    result.set(index, person);
+                }
+                chosenByUser.put(personUserId, person);
+            }
+        }
+        return result.stream().map(person -> toResponse(person, relationToMe(userId, person))).toList();
+    }
+
+    /** 同一账号在多家族存在多张成员卡时，选择展示优先级更高的一张。 */
+    private int score(LovedOne person, Long viewerId, Map<Long, String> roleByFamily) {
+        int score = relationToMe(viewerId, person) != null ? 2 : 0;
+        if ("OWNER".equals(roleByFamily.get(person.getFamilyId()))) {
+            score += 1;
+        }
+        return score;
     }
 
     @Transactional(readOnly = true)

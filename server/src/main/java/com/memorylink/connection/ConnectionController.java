@@ -70,9 +70,10 @@ public class ConnectionController {
 
     @GetMapping("/graph")
     public ApiResponse<RelationshipGraphResponse> graph(
-            @RequestParam(value = "includePending", defaultValue = "false") boolean includePending) {
+            @RequestParam(value = "includePending", defaultValue = "false") boolean includePending,
+            @RequestParam(value = "includeExtended", defaultValue = "false") boolean includeExtended) {
         return ApiResponse.ok(connectionService.graph(
-                SecurityUtils.currentUser().userId(), includePending));
+                SecurityUtils.currentUser().userId(), includePending, includeExtended));
     }
 
     @PostMapping("/relationships/{relationshipId}/confirm")

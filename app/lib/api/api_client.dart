@@ -221,9 +221,13 @@ class ApiClient {
     _decode(response);
   }
 
-  Future<RelationGraph> relationGraph(String token, {bool includePending = false}) async {
+  Future<RelationGraph> relationGraph(
+    String token, {
+    bool includePending = false,
+    bool includeExtended = false,
+  }) async {
     final data = await _get(
-      '/api/v1/connections/graph?includePending=$includePending',
+      '/api/v1/connections/graph?includePending=$includePending&includeExtended=$includeExtended',
       token: token,
     );
     return RelationGraph.fromJson(data as Map<String, dynamic>);

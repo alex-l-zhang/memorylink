@@ -10,9 +10,14 @@ class FakeApi extends ApiClient {
 
   bool confirmed = false;
   bool rejected = false;
+  bool connectionSent = false;
 
   @override
-  Future<RelationGraph> relationGraph(String token, {bool includePending = false}) async {
+  Future<RelationGraph> relationGraph(
+    String token, {
+    bool includePending = false,
+    bool includeExtended = false,
+  }) async {
     return RelationGraph(
       self: GraphNode(userId: 1, name: '李小河', myStatus: 'ACTIVE', isSelf: true),
       nodes: [
@@ -36,6 +41,16 @@ class FakeApi extends ApiClient {
             myStatus: 'PENDING',
             otherStatus: 'ACTIVE',
             pending: true,
+          ),
+        if (includeExtended)
+          GraphNode(
+            userId: 4,
+            name: '袁蓉',
+            myStatus: 'EXTENDED',
+            extended: true,
+            viaUserId: 2,
+            viaUserName: '张耘嫣',
+            relationFromVia: 'MOTHER',
           ),
       ],
       pendingCount: 1,
@@ -71,6 +86,16 @@ class FakeApi extends ApiClient {
   Future<void> rejectMessage(String token, int messageId) async {
     rejected = true;
   }
+
+  @override
+  Future<void> sendConnections(
+    String token, {
+    required List<int> targetIds,
+    required String relation,
+    String? inverseRelation,
+  }) async {
+    connectionSent = true;
+  }
 }
 
 void main() {
@@ -83,7 +108,10 @@ void main() {
     expect(find.text('李大山'), findsOneWidget);
     expect(find.text('李小明'), findsNothing);
 
-    await tester.tap(find.byType(Switch));
+    await tester.tap(find.descendant(
+      of: find.widgetWithText(SwitchListTile, '显示待确认节点'),
+      matching: find.byType(Switch),
+    ));
     await tester.pumpAndSettle();
 
     expect(find.text('李小明'), findsOneWidget);
@@ -103,5 +131,29 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(api.confirmed, isTrue);
+  });
+
+  testWidgets('图谱可展开家人的家人并一键发起建立联系', (tester) async {
+    final api = FakeApi();
+    await tester.pumpWidget(MaterialApp(home: FamilyGraphScreen(api: api, token: 't')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('显示家人的家人'), findsOneWidget);
+    expect(find.text('袁蓉'), findsNothing);
+
+    await tester.tap(find.text('显示家人的家人'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('袁蓉'), findsOneWidget);
+    expect(find.text('张耘嫣的母亲'), findsOneWidget);
+
+    await tester.tap(find.text('袁蓉'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('关系路径：张耘嫣的母亲'), findsOneWidget);
+    await tester.tap(find.text('发起建立联系'));
+    await tester.pumpAndSettle();
+
+    expect(api.connectionSent, isTrue);
   });
 }

@@ -180,13 +180,16 @@ public class ConnectionService {
     /**
      * 以自己为中心的家族关系图谱。
      * 默认只返回我已确认的家人；includePending=true 时附带"待确认"节点（半透明展示）。
+     * includeExtended=true 时附带"家人的家人"（二级节点，带关系路径，用于顺藤摸瓜发起建立联系）。
      */
     @Transactional(readOnly = true)
-    public RelationshipGraphResponse graph(Long userId, boolean includePending) {
+    public RelationshipGraphResponse graph(Long userId, boolean includePending, boolean includeExtended) {
         User me = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(CODE_USER_NOT_FOUND, "用户不存在"));
         List<GraphNodeResponse> nodes = new java.util.ArrayList<>();
         long pending = 0;
+        Set<Long> directIds = new java.util.HashSet<>();
+        directIds.add(userId);
         for (FamilyRelationship relationship : allOfMine(userId)) {
             String myStatus = RelationshipVisibility.myStatus(relationship, userId);
             if (myStatus == null || RelationshipVisibility.REMOVED.equals(myStatus)) {
@@ -200,6 +203,7 @@ public class ConnectionService {
                 }
             }
             Long otherId = RelationshipVisibility.otherId(relationship, userId);
+            directIds.add(otherId);
             User other = userRepository.findById(otherId).orElse(null);
             String otherStatus = RelationshipVisibility.sideStatus(relationship, otherId);
             nodes.add(new GraphNodeResponse(
@@ -215,7 +219,15 @@ public class ConnectionService {
                     myStatus,
                     otherStatus,
                     !mine || !RelationshipVisibility.ACTIVE.equals(otherStatus),
+                    false,
+                    false,
+                    null,
+                    null,
+                    null,
                     false));
+        }
+        if (includeExtended) {
+            nodes.addAll(extendedNodes(userId, nodes, directIds));
         }
         GraphNodeResponse self = new GraphNodeResponse(
                 me.getId(), me.getName(),
@@ -223,8 +235,69 @@ public class ConnectionService {
                 me.getBirthDate() == null ? null : me.getBirthDate().getMonthValue(),
                 me.getBirthPlace(), me.getGender(),
                 null, null, null,
-                RelationshipVisibility.ACTIVE, RelationshipVisibility.ACTIVE, false, true);
+                RelationshipVisibility.ACTIVE, RelationshipVisibility.ACTIVE, false, true,
+                false, null, null, null, false);
         return new RelationshipGraphResponse(self, nodes, pending);
+    }
+
+    /**
+     * 二级节点："我已确认的家人"所确认的家人，且我与 TA 之间还没有关系。
+     * 只返回能给出关系路径的（例如"张耘嫣的母亲"），便于用户顺藤摸瓜发起建立联系。
+     */
+    private List<GraphNodeResponse> extendedNodes(Long userId, List<GraphNodeResponse> directNodes,
+                                                  Set<Long> directIds) {
+        List<GraphNodeResponse> extended = new java.util.ArrayList<>();
+        Set<Long> seen = new java.util.HashSet<>();
+        for (GraphNodeResponse direct : directNodes) {
+            if (direct.extended() || direct.userId() == null) {
+                continue;
+            }
+            for (FamilyRelationship relationship : allOfMine(direct.userId())) {
+                if (!RelationshipVisibility.visibleTo(relationship, direct.userId())) {
+                    continue;
+                }
+                Long otherId = RelationshipVisibility.otherId(relationship, direct.userId());
+                if (otherId == null || directIds.contains(otherId) || !seen.add(otherId)) {
+                    continue;
+                }
+                if (hasAnyRelationshipWith(userId, otherId)) {
+                    continue;
+                }
+                User other = userRepository.findById(otherId).orElse(null);
+                if (other == null) {
+                    continue;
+                }
+                extended.add(new GraphNodeResponse(
+                        otherId,
+                        other.getName(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "EXTENDED",
+                        null,
+                        false,
+                        false,
+                        true,
+                        direct.userId(),
+                        direct.name(),
+                        RelationshipVisibility.relationFromMe(relationship, direct.userId()),
+                        requestRepository.existsByRequesterIdAndTargetIdAndStatus(
+                                userId, otherId, "PENDING")));
+            }
+        }
+        return extended;
+    }
+
+    private boolean hasAnyRelationshipWith(Long userId, Long otherId) {
+        return relationshipRepository.findByUserAIdAndUserBId(userId, otherId)
+                .filter(r -> !RelationshipVisibility.REMOVED.equals(r.getStatus()))
+                .or(() -> relationshipRepository.findByUserBIdAndUserAId(userId, otherId)
+                        .filter(r -> !RelationshipVisibility.REMOVED.equals(r.getStatus())))
+                .isPresent();
     }
 
     private List<FamilyRelationship> allOfMine(Long userId) {

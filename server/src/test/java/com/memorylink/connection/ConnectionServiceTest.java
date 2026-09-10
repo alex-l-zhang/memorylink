@@ -231,11 +231,75 @@ class ConnectionServiceTest {
 
         assertThat(service.relationships(1L)).isEmpty();
         // 对方那一侧已确认，可以在图谱里看到"待我方确认"的半透明节点
-        var graph = service.graph(1L, true);
+        var graph = service.graph(1L, true, false);
         assertThat(graph.pendingCount()).isEqualTo(1);
         assertThat(graph.nodes()).hasSize(1);
         assertThat(graph.nodes().get(0).myStatus()).isEqualTo("PENDING");
-        assertThat(service.graph(1L, false).nodes()).isEmpty();
+        assertThat(service.graph(1L, false, false).nodes()).isEmpty();
+    }
+
+    @Test
+    void graphShowsExtendedNodesWithRelationPath() {
+        FamilyRelationship mine = new FamilyRelationship();
+        mine.setId(7L);
+        mine.setUserAId(1L);
+        mine.setUserBId(2L);
+        mine.setRelationAToB("DAUGHTER");
+        mine.setRelationBToA("FATHER");
+        mine.setStatus("ACTIVE");
+        mine.setAStatus("ACTIVE");
+        mine.setBStatus("ACTIVE");
+        FamilyRelationship peerSide = new FamilyRelationship();
+        peerSide.setId(8L);
+        peerSide.setUserAId(3L);
+        peerSide.setUserBId(2L);
+        peerSide.setRelationAToB("DAUGHTER");
+        peerSide.setRelationBToA("MOTHER");
+        peerSide.setStatus("ACTIVE");
+        peerSide.setAStatus("ACTIVE");
+        peerSide.setBStatus("ACTIVE");
+        when(relationshipRepository.findByUserAId(1L)).thenReturn(List.of(mine));
+        when(relationshipRepository.findByUserBId(1L)).thenReturn(List.of());
+        when(relationshipRepository.findByUserAId(2L)).thenReturn(List.of(peerSide));
+        when(relationshipRepository.findByUserBId(2L)).thenReturn(List.of());
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "我", null, null)));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user(2L, "张耘嫣", null, null)));
+        when(userRepository.findById(3L)).thenReturn(Optional.of(user(3L, "袁蓉", null, null)));
+        when(relationshipRepository.findByUserAIdAndUserBId(1L, 3L)).thenReturn(Optional.empty());
+        when(relationshipRepository.findByUserBIdAndUserAId(1L, 3L)).thenReturn(Optional.empty());
+
+        var graph = service.graph(1L, false, true);
+
+        assertThat(graph.nodes()).hasSize(2);
+        var extended = graph.nodes().stream().filter(n -> n.extended()).findFirst().orElseThrow();
+        assertThat(extended.userId()).isEqualTo(3L);
+        assertThat(extended.name()).isEqualTo("袁蓉");
+        assertThat(extended.viaUserId()).isEqualTo(2L);
+        assertThat(extended.viaUserName()).isEqualTo("张耘嫣");
+        assertThat(extended.relationFromVia()).isEqualTo("MOTHER");
+        assertThat(extended.birthYear()).isNull();
+    }
+
+    @Test
+    void graphHidesExtendedWhenSwitchOff() {
+        FamilyRelationship mine = new FamilyRelationship();
+        mine.setId(7L);
+        mine.setUserAId(1L);
+        mine.setUserBId(2L);
+        mine.setRelationAToB("DAUGHTER");
+        mine.setRelationBToA("FATHER");
+        mine.setStatus("ACTIVE");
+        mine.setAStatus("ACTIVE");
+        mine.setBStatus("ACTIVE");
+        when(relationshipRepository.findByUserAId(1L)).thenReturn(List.of(mine));
+        when(relationshipRepository.findByUserBId(1L)).thenReturn(List.of());
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "我", null, null)));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user(2L, "张耘嫣", null, null)));
+
+        var graph = service.graph(1L, false, false);
+
+        assertThat(graph.nodes()).hasSize(1);
+        assertThat(graph.nodes().get(0).extended()).isFalse();
     }
 
     @Test

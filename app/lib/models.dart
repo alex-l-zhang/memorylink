@@ -419,6 +419,11 @@ class GraphNode {
   final String? otherStatus;
   final bool pending;
   final bool isSelf;
+  final bool extended;
+  final int? viaUserId;
+  final String? viaUserName;
+  final String? relationFromVia;
+  final bool requestPending;
 
   GraphNode({
     required this.userId,
@@ -434,6 +439,11 @@ class GraphNode {
     this.otherStatus,
     this.pending = false,
     this.isSelf = false,
+    this.extended = false,
+    this.viaUserId,
+    this.viaUserName,
+    this.relationFromVia,
+    this.requestPending = false,
   });
 
   factory GraphNode.fromJson(Map<String, dynamic> json) => GraphNode(
@@ -450,6 +460,11 @@ class GraphNode {
         otherStatus: json['otherStatus'] as String?,
         pending: json['pending'] as bool? ?? false,
         isSelf: json['isSelf'] as bool? ?? false,
+        extended: json['extended'] as bool? ?? false,
+        viaUserId: (json['viaUserId'] as num?)?.toInt(),
+        viaUserName: json['viaUserName'] as String?,
+        relationFromVia: json['relationFromVia'] as String?,
+        requestPending: json['requestPending'] as bool? ?? false,
       );
 }
 

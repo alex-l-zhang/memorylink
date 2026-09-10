@@ -21,6 +21,7 @@ class FamilyGraphScreen extends StatefulWidget {
 class _FamilyGraphScreenState extends State<FamilyGraphScreen> {
   RelationGraph? _graph;
   bool _includePending = false;
+  bool _includeExtended = false;
   bool _loading = true;
   bool _changed = false;
   String? _error;
@@ -39,7 +40,11 @@ class _FamilyGraphScreenState extends State<FamilyGraphScreen> {
     });
     try {
       final graph =
-          await widget.api.relationGraph(widget.token, includePending: _includePending);
+          await widget.api.relationGraph(
+        widget.token,
+        includePending: _includePending,
+        includeExtended: _includeExtended,
+      );
       if (!mounted) return;
       setState(() => _graph = graph);
     } on ApiException catch (e) {
@@ -54,6 +59,22 @@ class _FamilyGraphScreenState extends State<FamilyGraphScreen> {
   Future<void> _openNode(GraphNode node) async {
     if (node.isSelf) {
       _showSelfInfo(node);
+      return;
+    }
+    if (node.extended) {
+      final requested = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        builder: (_) => _ExtendedNodeSheet(
+          api: widget.api,
+          token: widget.token,
+          node: node,
+        ),
+      );
+      if (requested == true) {
+        _changed = true;
+        await _reload();
+      }
       return;
     }
     final changed = await showModalBottomSheet<bool>(
@@ -115,6 +136,17 @@ class _FamilyGraphScreenState extends State<FamilyGraphScreen> {
                 _reload();
               },
             ),
+            SwitchListTile(
+              value: _includeExtended,
+              title: const Text('显示家人的家人'),
+              subtitle: Text(_graph == null
+                  ? '虚线节点：经由我已确认的家人关联到的人'
+                  : '虚线节点：${_extendedCount()} 位家人的家人，可点开发起建立联系'),
+              onChanged: (value) {
+                setState(() => _includeExtended = value);
+                _reload();
+              },
+            ),
             const Divider(height: 1),
             Expanded(child: _buildBody()),
           ],
@@ -122,6 +154,9 @@ class _FamilyGraphScreenState extends State<FamilyGraphScreen> {
       ),
     );
   }
+
+  int _extendedCount() =>
+      _graph?.nodes.where((node) => node.extended).length ?? 0;
 
   Widget _buildBody() {
     if (_loading) return const Center(child: CircularProgressIndicator());
@@ -175,7 +210,9 @@ class _FamilyGraphScreenState extends State<FamilyGraphScreen> {
       color: Theme.of(context).colorScheme.surfaceContainerHighest,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Text(
-        '${node.name} · ${_relationSummary(node)} · ${_birthText(node)} · 籍贯：${node.birthPlace ?? '未填写'}',
+        node.extended
+            ? '${node.name} · ${_pathSummary(node)} · 你与 TA 还没有建立关系'
+            : '${node.name} · ${_relationSummary(node)} · ${_birthText(node)} · 籍贯：${node.birthPlace ?? '未填写'}',
         style: const TextStyle(fontSize: 12),
       ),
     );
@@ -205,32 +242,73 @@ class _GraphCanvas extends StatelessWidget {
         final center = Offset(width / 2, height / 2);
         final radiusX = math.max(80.0, width / 2 - nodeWidth / 2 - 8);
         final radiusY = math.max(80.0, height / 2 - nodeHeight / 2 - 16);
-        final nodes = graph.nodes;
+        final nodes = graph.nodes.where((node) => !node.extended).toList();
+        final extendedNodes = graph.nodes.where((node) => node.extended).toList();
         final positions = <GraphNode, Offset>{};
+        final angleByUser = <int, double>{};
         for (var i = 0; i < nodes.length; i++) {
           final angle = -math.pi / 2 + (2 * math.pi * i / math.max(nodes.length, 1));
+          angleByUser[nodes[i].userId] = angle;
           positions[nodes[i]] = Offset(
-            center.dx + radiusX * math.cos(angle),
-            center.dy + radiusY * math.sin(angle),
+            center.dx + radiusX * 0.64 * math.cos(angle),
+            center.dy + radiusY * 0.64 * math.sin(angle),
           );
         }
+        // 二级节点（家人的家人）：围绕其"路径中间人"的角度排在外圈
+        final byVia = <int?, List<GraphNode>>{};
+        for (final node in extendedNodes) {
+          byVia.putIfAbsent(node.viaUserId, () => []).add(node);
+        }
+        final extendedPositions = <GraphNode, Offset>{};
+        byVia.forEach((viaId, group) {
+          final base = angleByUser[viaId] ?? -math.pi / 2;
+          final step = 0.34;
+          for (var i = 0; i < group.length; i++) {
+            final angle = base + (i - (group.length - 1) / 2) * step;
+            extendedPositions[group[i]] = Offset(
+              center.dx + radiusX * math.cos(angle),
+              center.dy + radiusY * math.sin(angle),
+            );
+          }
+        });
+        final positionByUser = <int, Offset>{
+          for (final entry in positions.entries) entry.key.userId: entry.value,
+          graph.self.userId: center,
+        };
+        final edges = <_Edge>[
+          for (final entry in positions.entries)
+            _Edge(center, entry.value, entry.key.pending, false),
+          for (final entry in extendedPositions.entries)
+            _Edge(
+              positionByUser[entry.key.viaUserId] ?? center,
+              entry.value,
+              false,
+              true,
+            ),
+        ];
         return Stack(
           children: [
             Positioned.fill(
               child: CustomPaint(
                 painter: _EdgePainter(
-                  center: center,
-                  positions: positions.values.toList(),
-                  pending: positions.entries
-                      .where((e) => e.key.pending)
-                      .map((e) => e.value)
-                      .toList(),
+                  edges: edges,
                   activeColor: Theme.of(context).colorScheme.outlineVariant,
                   pendingColor: Theme.of(context).colorScheme.outline,
                 ),
               ),
             ),
             ...positions.entries.map((entry) => Positioned(
+                  left: entry.value.dx - nodeWidth / 2,
+                  top: entry.value.dy - nodeHeight / 2,
+                  width: nodeWidth,
+                  height: nodeHeight,
+                  child: _NodeCard(
+                    node: entry.key,
+                    onHover: onHover,
+                    onTap: () => onTap(entry.key),
+                  ),
+                )),
+            ...extendedPositions.entries.map((entry) => Positioned(
                   left: entry.value.dx - nodeWidth / 2,
                   top: entry.value.dy - nodeHeight / 2,
                   width: nodeWidth,
@@ -255,6 +333,15 @@ class _GraphCanvas extends StatelessWidget {
   }
 }
 
+class _Edge {
+  final Offset from;
+  final Offset to;
+  final bool pending;
+  final bool dashed;
+
+  _Edge(this.from, this.to, this.pending, this.dashed);
+}
+
 class _NodeCard extends StatelessWidget {
   final GraphNode node;
   final ValueChanged<GraphNode> onHover;
@@ -265,10 +352,55 @@ class _NodeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final color = node.isSelf ? scheme.primaryContainer : scheme.surfaceContainerHighest;
+    final color = node.isSelf
+        ? scheme.primaryContainer
+        : node.extended
+            ? scheme.surfaceContainerLow
+            : scheme.surfaceContainerHighest;
     final relation = node.isSelf
         ? '我'
-        : (node.relationFromMe == null ? '待确认' : relationLabel(node.relationFromMe));
+        : node.extended
+            ? _pathLabel(node)
+            : (node.relationFromMe == null ? '待确认' : relationLabel(node.relationFromMe));
+    final card = Container(
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(10),
+        border: node.extended
+            ? null
+            : Border.all(
+                color: node.pending ? scheme.outline : scheme.primary,
+                width: node.isSelf ? 2 : 1,
+              ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                node.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              if (node.extended) ...[
+                const SizedBox(width: 4),
+                Icon(Icons.link, size: 11, color: scheme.outline),
+              ],
+            ],
+          ),
+          Text(
+            node.pending && !node.isSelf ? '$relation（待确认）' : relation,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
     return MouseRegion(
       onEnter: (_) => onHover(node),
       onHover: (_) => onHover(node),
@@ -276,38 +408,18 @@ class _NodeCard extends StatelessWidget {
       child: Tooltip(
         message: '${node.name}（$relation）',
         child: Opacity(
-          opacity: node.pending ? 0.55 : 1,
+          opacity: node.pending || node.extended ? 0.6 : 1,
           child: GestureDetector(
             onTap: onTap,
-            child: Container(
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: node.pending ? scheme.outline : scheme.primary,
-                  width: node.isSelf ? 2 : 1,
-                  style: node.pending ? BorderStyle.solid : BorderStyle.solid,
-                ),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    node.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                  Text(
-                    node.pending && !node.isSelf ? '$relation（待确认）' : relation,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
-                  ),
-                ],
-              ),
-            ),
+            child: node.extended
+                ? CustomPaint(
+                    foregroundPainter: _DashedBorderPainter(
+                      color: scheme.outline,
+                      radius: 10,
+                    ),
+                    child: card,
+                  )
+                : card,
           ),
         ),
       ),
@@ -315,38 +427,188 @@ class _NodeCard extends StatelessWidget {
   }
 }
 
+/// 虚线圆角边框：用于"家人的家人"二级节点。
+class _DashedBorderPainter extends CustomPainter {
+  final Color color;
+  final double radius;
+
+  _DashedBorderPainter({required this.color, required this.radius});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(radius)));
+    const dash = 5.0;
+    const gap = 4.0;
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        final next = math.min(distance + dash, metric.length);
+        canvas.drawPath(metric.extractPath(distance, next), paint);
+        distance = next + gap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedBorderPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.radius != radius;
+}
+
 class _EdgePainter extends CustomPainter {
-  final Offset center;
-  final List<Offset> positions;
-  final List<Offset> pending;
+  final List<_Edge> edges;
   final Color activeColor;
   final Color pendingColor;
 
   _EdgePainter({
-    required this.center,
-    required this.positions,
-    required this.pending,
+    required this.edges,
     required this.activeColor,
     required this.pendingColor,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    for (final position in positions) {
-      final isPending = pending.contains(position);
+    for (final edge in edges) {
       final paint = Paint()
-        ..color = isPending ? pendingColor.withValues(alpha: 0.5) : activeColor
-        ..strokeWidth = isPending ? 1 : 1.6;
-      canvas.drawLine(center, position, paint);
+        ..color = edge.pending || edge.dashed
+            ? pendingColor.withValues(alpha: 0.5)
+            : activeColor
+        ..strokeWidth = edge.pending || edge.dashed ? 1 : 1.6;
+      if (edge.dashed) {
+        _drawDashedLine(canvas, edge.from, edge.to, paint);
+      } else {
+        canvas.drawLine(edge.from, edge.to, paint);
+      }
+    }
+  }
+
+  void _drawDashedLine(Canvas canvas, Offset from, Offset to, Paint paint) {
+    const dash = 6.0;
+    const gap = 5.0;
+    final total = (to - from).distance;
+    if (total == 0) return;
+    final direction = (to - from) / total;
+    var travelled = 0.0;
+    while (travelled < total) {
+      final end = math.min(travelled + dash, total);
+      canvas.drawLine(from + direction * travelled, from + direction * end, paint);
+      travelled = end + gap;
     }
   }
 
   @override
-  bool shouldRepaint(_EdgePainter oldDelegate) =>
-      oldDelegate.positions != positions || oldDelegate.center != center;
+  bool shouldRepaint(_EdgePainter oldDelegate) => oldDelegate.edges != edges;
 }
 
 /// 节点详情与关系操作：确认（可改称谓）/ 解除关系。
+class _ExtendedNodeSheet extends StatefulWidget {
+  final ApiClient api;
+  final String token;
+  final GraphNode node;
+
+  const _ExtendedNodeSheet({
+    required this.api,
+    required this.token,
+    required this.node,
+  });
+
+  @override
+  State<_ExtendedNodeSheet> createState() => _ExtendedNodeSheetState();
+}
+
+class _ExtendedNodeSheetState extends State<_ExtendedNodeSheet> {
+  String _relation = 'FRIEND';
+  bool _busy = false;
+  late bool _sent = widget.node.requestPending;
+
+  Future<void> _send() async {
+    setState(() => _busy = true);
+    try {
+      await widget.api.sendConnections(
+        widget.token,
+        targetIds: [widget.node.userId],
+        relation: _relation,
+      );
+      if (!mounted) return;
+      setState(() => _sent = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已向${widget.node.name}发起建立联系，等待对方同意')),
+      );
+    } on ApiException catch (e) {
+      _snack(e.message);
+    } catch (_) {
+      _snack('发送失败，请稍后重试');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _snack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final node = widget.node;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(node.name, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text('关系路径：${_pathLabel(node)}'),
+            const SizedBox(height: 4),
+            Text(
+              '这是你家人的家人，你与 TA 还没有建立关系。发起后需要对方同意，'
+              '同意后双方档案中才能互相看到。',
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 16),
+            if (_sent)
+              Row(
+                children: [
+                  const Icon(Icons.hourglass_top, size: 18),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text('已发起建立联系，等待${node.name}同意')),
+                ],
+              )
+            else ...[
+              DropdownButtonFormField<String>(
+                initialValue: _relation,
+                decoration: const InputDecoration(
+                  labelText: '我是 TA 的：',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                items: relationOptions
+                    .map((o) => DropdownMenuItem(value: o.code, child: Text(o.label)))
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) setState(() => _relation = value);
+                },
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: _busy ? null : _send,
+                icon: const Icon(Icons.person_add_alt),
+                label: Text(_busy ? '发送中…' : '发起建立联系'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _NodeSheet extends StatefulWidget {
   final ApiClient api;
   final String token;
@@ -477,6 +739,19 @@ String _relationSummary(GraphNode node) {
       node.relationFromOther == null ? '我是对方的：待确认' : '我是对方的${relationLabel(node.relationFromOther)}';
   return '$fromMe / $fromOther';
 }
+
+/// 二级节点的关系路径，例如"张耘嫣的母亲"。
+String _pathLabel(GraphNode node) {
+  if (node.viaUserName == null) {
+    return '家人的家人';
+  }
+  if (node.relationFromVia == null) {
+    return '${node.viaUserName}的家人';
+  }
+  return '${node.viaUserName}的${relationLabel(node.relationFromVia)}';
+}
+
+String _pathSummary(GraphNode node) => _pathLabel(node);
 
 String _birthText(GraphNode node) {
   if (node.birthYear == null) return '未填写';

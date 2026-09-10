@@ -1,11 +1,13 @@
 package com.memorylink.connection;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.memorylink.audit.AuditService;
+import com.memorylink.common.BusinessException;
 import com.memorylink.connection.dto.UserCandidateResponse;
 import com.memorylink.family.Family;
 import com.memorylink.family.FamilyMemberRepository;
@@ -131,5 +133,22 @@ class ConnectionServiceTest {
         assertThat(history.get(0).targetName()).isEqualTo("张三");
         assertThat(history.get(0).status()).isEqualTo("ACCEPTED");
         assertThat(history.get(0).relation()).isEqualTo("SON");
+    }
+
+    @Test
+    void acceptAmbiguousRelationWithoutGenderRejected() {
+        ConnectionRequest request = new ConnectionRequest();
+        request.setId(12L);
+        request.setRequesterId(1L);
+        request.setTargetId(2L);
+        request.setRelation("DAUGHTER");
+        when(requestRepository.findByIdAndTargetIdAndStatus(12L, 2L, "PENDING"))
+                .thenReturn(Optional.of(request));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "何女", null, null)));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user(2L, "某人", null, null)));
+
+        assertThatThrownBy(() -> service.accept(2L, 12L, null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("需要确认");
     }
 }

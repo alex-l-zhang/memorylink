@@ -507,7 +507,7 @@ class _ClaimDialog extends StatefulWidget {
 
 class _ClaimDialogState extends State<_ClaimDialog> {
   final _code = TextEditingController();
-  String _relation = 'CHILD';
+  String _relation = 'SON';
   String _inverseRelation = 'FATHER';
   bool _submitting = false;
   bool _querying = false;
@@ -636,24 +636,8 @@ class _ClaimDialogState extends State<_ClaimDialog> {
               },
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: _inverseRelation,
-              decoration: const InputDecoration(labelText: '邀请人是我的：', border: OutlineInputBorder()),
-              items: relationOptions
-                  .map((o) => DropdownMenuItem(value: o.code, child: Text(o.label)))
-                  .toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() {
-                    _inverseRelation = value;
-                    _relation = suggestedInverse(value) ?? _relation;
-                  });
-                }
-              },
-            ),
-            const SizedBox(height: 12),
             Text(
-              '将提交：我是邀请人的${relationLabel(_relation)} · 邀请人是我的${relationLabel(_inverseRelation)}',
+              '将提交：我是邀请人的${relationLabel(_relation)}',
               style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ],

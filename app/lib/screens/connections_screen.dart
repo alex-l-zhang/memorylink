@@ -188,24 +188,8 @@ class _SearchTabState extends State<_SearchTab> {
             },
           ),
           const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            initialValue: _inverseRelation,
-            decoration: const InputDecoration(labelText: '你是我的：', border: OutlineInputBorder()),
-            items: connectionRelationOptions
-                .map((o) => DropdownMenuItem(value: o.code, child: Text(o.label)))
-                .toList(),
-            onChanged: (value) {
-              if (value != null) {
-                setState(() {
-                  _inverseRelation = value;
-                  _relation = suggestedInverse(value) ?? _relation;
-                });
-              }
-            },
-          ),
-          const SizedBox(height: 12),
           Text(
-            '将发送：我是你的${_relationLabel(_relation)} · 你是我的${_relationLabel(_inverseRelation)}',
+            '将发送：我是你的${_relationLabel(_relation)}',
             style: const TextStyle(fontSize: 12, color: Colors.grey),
           ),
           const SizedBox(height: 12),

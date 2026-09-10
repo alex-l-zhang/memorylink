@@ -98,7 +98,11 @@ public class ConnectionService {
             User target = userRepository.findById(targetId)
                     .orElseThrow(() -> new BusinessException(CODE_USER_NOT_FOUND, "联系人不存在"));
             ensureNotConnected(userId, targetId, target.getName());
-            ConnectionRequest request = new ConnectionRequest();
+            ConnectionRequest request = requestRepository
+                    .findFirstByRequesterIdAndTargetIdOrderByIdDesc(userId, targetId)
+                    .orElseGet(() -> requestRepository
+                            .findFirstByTargetIdAndRequesterIdOrderByIdDesc(userId, targetId)
+                            .orElseGet(ConnectionRequest::new));
             request.setRequesterId(userId);
             request.setTargetId(targetId);
             request.setRequesterName(me.getName());
@@ -110,6 +114,7 @@ public class ConnectionService {
             request.setRelation(rel);
             request.setInverseRelation(inverse);
             request.setStatus("PENDING");
+            request.setRespondedAt(null);
             requestRepository.save(request);
             sent++;
         }
@@ -235,7 +240,10 @@ public class ConnectionService {
         }
         memberProfileService.ensureMemberProfile(family.getId(), requester.getId());
         memberProfileService.ensureMemberProfile(family.getId(), userId);
-        FamilyRelationship relationship = new FamilyRelationship();
+        FamilyRelationship relationship = relationshipRepository
+                .findByUserAIdAndUserBId(requester.getId(), userId)
+                .or(() -> relationshipRepository.findByUserBIdAndUserAId(requester.getId(), userId))
+                .orElseGet(FamilyRelationship::new);
         relationship.setUserAId(requester.getId());
         relationship.setUserBId(userId);
         // A=发起人, B=被联系人
@@ -265,8 +273,10 @@ public class ConnectionService {
 
     private Set<Long> relatedIds(Long userId) {
         Set<Long> ids = relationshipRepository.findByUserAId(userId).stream()
+                .filter(r -> "ACTIVE".equals(r.getStatus()))
                 .map(FamilyRelationship::getUserBId).collect(Collectors.toSet());
         ids.addAll(relationshipRepository.findByUserBId(userId).stream()
+                .filter(r -> "ACTIVE".equals(r.getStatus()))
                 .map(FamilyRelationship::getUserAId).collect(Collectors.toSet()));
         ids.addAll(requestRepository.findByRequesterIdAndStatusOrderByCreatedAtDesc(userId, "PENDING").stream()
                 .map(ConnectionRequest::getTargetId).collect(Collectors.toSet()));
@@ -276,8 +286,12 @@ public class ConnectionService {
     }
 
     private void ensureNotConnected(Long userId, Long targetId, String targetName) {
-        if (relationshipRepository.findByUserAIdAndUserBId(userId, targetId).isPresent()
-                || relationshipRepository.findByUserBIdAndUserAId(userId, targetId).isPresent()) {
+        boolean activeRelationship =
+                relationshipRepository.findByUserAIdAndUserBId(userId, targetId)
+                        .filter(r -> "ACTIVE".equals(r.getStatus())).isPresent()
+                || relationshipRepository.findByUserBIdAndUserAId(userId, targetId)
+                        .filter(r -> "ACTIVE".equals(r.getStatus())).isPresent();
+        if (activeRelationship) {
             throw new BusinessException(CODE_ALREADY, "你与「" + targetName + "」已建立联系");
         }
         if (requestRepository.existsByRequesterIdAndTargetIdAndStatus(userId, targetId, "PENDING")

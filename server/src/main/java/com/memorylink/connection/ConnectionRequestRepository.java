@@ -25,4 +25,6 @@ public interface ConnectionRequestRepository extends JpaRepository<ConnectionReq
     List<ConnectionRequest> findByTargetIdOrderByCreatedAtDesc(Long targetId);
 
     Optional<ConnectionRequest> findFirstByRequesterIdAndTargetIdOrderByIdDesc(Long requesterId, Long targetId);
+
+    Optional<ConnectionRequest> findFirstByTargetIdAndRequesterIdOrderByIdDesc(Long targetId, Long requesterId);
 }

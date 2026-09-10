@@ -84,6 +84,38 @@ class ConnectionServiceTest {
     }
 
     @Test
+    void searchIncludesCounterpartAfterRelationshipRemoved() {
+        when(userRepository.findByName("张三")).thenReturn(List.of(user(2L, "张三", null, "北京")));
+        FamilyRelationship removed = new FamilyRelationship();
+        removed.setUserAId(1L);
+        removed.setUserBId(2L);
+        removed.setStatus("REMOVED");
+        when(relationshipRepository.findByUserAId(1L)).thenReturn(List.of(removed));
+
+        var result = service.search(1L, "张三");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).id()).isEqualTo(2L);
+    }
+
+    @Test
+    void sendReusesRemovedRequestRecord() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "李四", "1990-01-01", "杭州")));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user(2L, "张三", null, null)));
+        ConnectionRequest existing = new ConnectionRequest();
+        existing.setId(99L);
+        existing.setStatus("REMOVED");
+        when(requestRepository.findFirstByRequesterIdAndTargetIdOrderByIdDesc(1L, 2L))
+                .thenReturn(Optional.of(existing));
+
+        int sent = service.send(1L, List.of(2L), "SON", null);
+
+        assertThat(sent).isEqualTo(1);
+        assertThat(existing.getId()).isEqualTo(99L);
+        assertThat(existing.getStatus()).isEqualTo("PENDING");
+    }
+
+    @Test
     void sendCreatesPendingRequests() {
         when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "李四", "1990-01-01", "杭州")));
         when(userRepository.findById(2L)).thenReturn(Optional.of(user(2L, "张三", null, null)));

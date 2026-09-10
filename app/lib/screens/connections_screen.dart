@@ -286,7 +286,7 @@ class _IncomingTabState extends State<_IncomingTab> {
                       style: const TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   Text('对方：${_birthText(item.birthYear, item.birthMonth)} · 籍贯：${item.birthPlace ?? '未填写'}'),
-                  Text('对方声称的关系：我是你的 ${_relationLabel(item.relation)}'),
+                  Text('对方声称的关系：我是你的${_relationLabel(item.relation)}'),
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,

@@ -126,6 +126,57 @@ class NotificationServiceTest {
     }
 
     @Test
+    void fanoutReachesSecondHopMembersOfTheNetwork() {
+        // 张力(4) 的网络：家族 10（张耘嫣22）、家族 43（张耘嘉48）；
+        // 张耘嫣的家族 16 里还有袁蓉(11) —— 二跳成员也必须收到消息
+        when(familyMemberRepository.findByUserId(4L))
+                .thenReturn(List.of(member(10L, 4L), member(43L, 4L)));
+        when(familyMemberRepository.findByUserId(48L)).thenReturn(List.of(member(43L, 48L)));
+        when(familyMemberRepository.findByUserId(22L))
+                .thenReturn(List.of(member(10L, 22L), member(16L, 22L)));
+        when(familyMemberRepository.findByFamilyId(10L))
+                .thenReturn(List.of(member(10L, 22L), member(10L, 4L)));
+        when(familyMemberRepository.findByFamilyId(43L))
+                .thenReturn(List.of(member(43L, 48L), member(43L, 4L)));
+        when(familyMemberRepository.findByFamilyId(16L))
+                .thenReturn(List.of(member(16L, 11L), member(16L, 22L)));
+        when(relationshipRepository.findByUserAId(4L))
+                .thenReturn(List.of(confirmedRelationship(22L, 4L)));
+        when(relationshipRepository.findByUserAId(22L))
+                .thenReturn(List.of(confirmedRelationship(11L, 22L)));
+        when(relationshipRepository.findByUserAId(48L)).thenReturn(List.of());
+        when(relationshipRepository.findByUserBId(any())).thenReturn(List.of());
+        when(relationshipRepository.findByUserAIdAndUserBId(any(), any())).thenReturn(Optional.empty());
+        when(relationshipRepository.findByUserBIdAndUserAId(any(), any())).thenReturn(Optional.empty());
+        when(userRepository.findById(4L)).thenReturn(Optional.of(user(4L, "张力")));
+        when(userRepository.findById(48L)).thenReturn(Optional.of(user(48L, "张耘嘉")));
+        when(userRepository.findById(22L)).thenReturn(Optional.of(user(22L, "张耘嫣")));
+        when(userRepository.findById(11L)).thenReturn(Optional.of(user(11L, "袁蓉")));
+        when(notificationRepository.existsByRecipientIdAndRelationshipIdAndStatusIn(any(), any(), anyList()))
+                .thenReturn(false);
+
+        service.fanoutOnJoin(43L, 4L, 48L, "SON", null);
+
+        assertThat(capturedRelationships()).anyMatch(r ->
+                (r.getUserAId().equals(48L) && r.getUserBId().equals(11L))
+                        || (r.getUserAId().equals(11L) && r.getUserBId().equals(48L)));
+        assertThat(capturedNotifications()).anyMatch(n -> n.getRecipientId().equals(11L));
+    }
+
+    private List<FamilyRelationship> capturedRelationships() {
+        ArgumentCaptor<FamilyRelationship> captor =
+                ArgumentCaptor.forClass(FamilyRelationship.class);
+        verify(relationshipRepository, atLeastOnce()).save(captor.capture());
+        return captor.getAllValues();
+    }
+
+    private List<Notification> capturedNotifications() {
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository, atLeastOnce()).save(captor.capture());
+        return captor.getAllValues();
+    }
+
+    @Test
     void confirmMovesUserIntoOtherFamilyWhenTheyShareNone() {
         Notification notification = new Notification();
         notification.setId(5L);

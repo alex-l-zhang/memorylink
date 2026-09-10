@@ -128,11 +128,12 @@ public class NotificationService {
     }
 
     /**
-     * 成员入族后的扇出：让"新人的家族圈子"与"已知对象的家族圈子"互相认识。
+     * 成员入族后的扇出：让"新人的家族网络"与"已知对象的家族网络"互相认识。
      *
-     * <p>家族关系是一张网而不是孤岛：新人（被加入某家族的一方）进来后，
-     * 既要让新人与对方的家人认识，也要让对方的家人与新人的家人认识；
-     * 否则"张力把女儿介绍进来"时，张力自己家族里的其他成员（如张耘嫣）收不到任何消息。
+     * <p>家族关系是一张网而不是孤岛：一个人进入网络时，网络里的所有人都应收到确认消息。
+     * 网络 = 从该人出发，沿"共同家族成员 + 已确认关系"做广度优先遍历得到的整个连通图；
+     * 这样"张耘嘉进入张力的家族网络"时，张力的女儿张耘嫣、以及张耘嫣的母亲袁蓉（二跳）
+     * 都会收到消息，而不是只有直接相关的那几个人。
      *
      * @param familyId             本次加入的家族
      * @param newcomerId           新加入该家族的人
@@ -145,13 +146,13 @@ public class NotificationService {
                              String newcomerDeclaration, String newcomerSideOverride) {
         String declaration = blankToNull(newcomerDeclaration);
         String override = blankToNull(newcomerSideOverride);
-        Set<Long> newcomerCircle = circleOf(newcomerId, familyId);
-        Set<Long> peers = new LinkedHashSet<>(circleOf(knownPeerId, familyId));
-        peers.addAll(newcomerCircle);
+        Set<Long> newcomerNetwork = networkOf(newcomerId, familyId);
+        Set<Long> peerNetwork = networkOf(knownPeerId, familyId);
+        Set<Long> peers = new LinkedHashSet<>(peerNetwork);
         peers.remove(newcomerId);
         peers.remove(null);
 
-        // 一、新人与对方圈子里的每个人建立（或恢复）关系
+        // 一、新人与对方网络里的每个人建立（或恢复）关系
         for (Long peerId : peers) {
             boolean anchor = Objects.equals(peerId, knownPeerId);
             FamilyRelationship relationship = ensureRelationship(newcomerId, peerId);
@@ -170,9 +171,9 @@ public class NotificationService {
                     anchor ? RelationCatalog.suggest(declaration) : null);
         }
 
-        // 二、对方的家人与新人的家人互相认识（已知对象 × 新人的圈子）
+        // 二、已知对象与新人的网络成员互相认识
         if (knownPeerId != null) {
-            for (Long memberId : newcomerCircle) {
+            for (Long memberId : newcomerNetwork) {
                 if (memberId.equals(newcomerId) || memberId.equals(knownPeerId)) {
                     continue;
                 }
@@ -184,7 +185,36 @@ public class NotificationService {
         }
     }
 
-    /** 某个人的"家族圈子"：自己 + 所在家族的全部成员 + 已确认关系的联系人。 */
+    /** 网络规模上限：超过时退化为"一跳圈子"，避免一次入族产生海量消息。 */
+    private static final int MAX_NETWORK_SIZE = 200;
+
+    /**
+     * 某个人的"家族网络"：从该人出发做广度优先遍历，
+     * 每一步展开"所在家族的全部成员"与"已确认关系的联系人"，得到整个连通图。
+     * 规模超过 {@link #MAX_NETWORK_SIZE} 时退化为 {@link #circleOf}（只取一跳）。
+     */
+    private Set<Long> networkOf(Long userId, Long extraFamilyId) {
+        Set<Long> oneHop = circleOf(userId, extraFamilyId);
+        if (oneHop.isEmpty()) {
+            return oneHop;
+        }
+        Set<Long> visited = new LinkedHashSet<>(oneHop);
+        java.util.ArrayDeque<Long> queue = new java.util.ArrayDeque<>(oneHop);
+        while (!queue.isEmpty()) {
+            Long current = queue.poll();
+            for (Long next : circleOf(current, null)) {
+                if (visited.add(next)) {
+                    if (visited.size() > MAX_NETWORK_SIZE) {
+                        return oneHop;
+                    }
+                    queue.add(next);
+                }
+            }
+        }
+        return visited;
+    }
+
+    /** 某个人的"一跳圈子"：自己 + 所在家族的全部成员 + 已确认关系的联系人。 */
     private Set<Long> circleOf(Long userId, Long extraFamilyId) {
         Set<Long> circle = new LinkedHashSet<>();
         if (userId == null) {

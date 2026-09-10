@@ -98,7 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(labelText: '故人姓名'),
+          decoration: const InputDecoration(labelText: '姓名'),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
@@ -263,20 +263,19 @@ class _HomeScreenState extends State<HomeScreen> {
       itemCount: _lovedOnes.length,
       itemBuilder: (context, index) {
         final item = _lovedOnes[index];
+        final subtitleParts = <String>[
+          if (item.userId == widget.userId)
+            '自己'
+          else if (item.relationToMe != null)
+            '对方是我的${relationLabel(item.relationToMe)}',
+          if (item.birthDate != null) '生 ${item.birthDate}',
+          if (item.deathDate != null) '卒 ${item.deathDate}',
+          if (item.birthPlace != null) item.birthPlace!,
+        ];
         return ListTile(
           leading: const CircleAvatar(child: Icon(Icons.person)),
           title: Text(item.name),
-          subtitle: Text([
-            if (item.userId == widget.userId)
-              '自己'
-            else if (item.relationToMe != null)
-              '对方是我的${relationLabel(item.relationToMe)}'
-            else
-              item.isEffectivelyDeceased ? '故人' : '在世',
-            if (item.birthDate != null) '生 ${item.birthDate}',
-            if (item.deathDate != null) '卒 ${item.deathDate}',
-            if (item.birthPlace != null) item.birthPlace!,
-          ].join(' · ')),
+          subtitle: subtitleParts.isEmpty ? null : Text(subtitleParts.join(' · ')),
           trailing: const Icon(Icons.chevron_right),
           onTap: () async {
             await Navigator.of(context).push(

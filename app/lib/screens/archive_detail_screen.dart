@@ -340,9 +340,7 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
           ],
           if (_current.isEffectivelyDeceased) ...[
             const SizedBox(height: 16),
-            Text('故人档案', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 4),
-            const Text('故事问答需完成知情同意后可用。'),
+            const Text('故事问答需完成知情同意后可用。', style: TextStyle(color: Colors.grey)),
           ],
           const SizedBox(height: 16),
           Row(
@@ -371,7 +369,7 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
           else if (_oralsError != null)
             Text(_oralsError!, style: TextStyle(color: Theme.of(context).colorScheme.error))
           else if (_orals.isEmpty)
-            const Text('还没有口述历史。讲述者可录制自己的故事；故人档案可由家族成员上传音视频。')
+            const Text('还没有口述历史。讲述者可录制自己的故事；家族成员也可代为上传音视频。')
           else
             ..._orals.map(_oralTile),
           const SizedBox(height: 24),
@@ -646,7 +644,7 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
                 .firstOrNull ??
             '#$id')
         .join('、');
-    final typeLabel = record.consentType == 'PRE_AUTHORIZED' ? '故人生前预授权' : '两名近亲共同确认';
+    final typeLabel = record.consentType == 'PRE_AUTHORIZED' ? '本人生前预授权' : '两名近亲共同确认';
     final valid = record.status == 'VALID';
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),

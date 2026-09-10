@@ -146,7 +146,7 @@ public class OralHistoryService {
         }
         if (lovedOne.effectiveDeceased()) {
             if (!familyService.canManage(userId, lovedOne.getFamilyId())) {
-                throw new BusinessException(CODE_FORBIDDEN, "仅家族创建者/共建者可修改故人口述可见性");
+                throw new BusinessException(CODE_FORBIDDEN, "仅家族创建者/共建者可修改该口述的可见性");
             }
         } else if (!userId.equals(lovedOne.getUserId())) {
             throw new BusinessException(CODE_FORBIDDEN, "仅讲述者本人可修改可见性");
@@ -164,7 +164,7 @@ public class OralHistoryService {
                 .orElseThrow(() -> new BusinessException(CODE_ARCHIVE_NOT_FOUND, "口述记录不存在"));
         if (lovedOne.effectiveDeceased()) {
             if (!familyService.canManage(userId, lovedOne.getFamilyId())) {
-                throw new BusinessException(CODE_FORBIDDEN, "仅家族创建者/共建者可删除故人口述");
+                throw new BusinessException(CODE_FORBIDDEN, "仅家族创建者/共建者可删除该口述");
             }
         } else if (!userId.equals(lovedOne.getUserId())) {
             throw new BusinessException(CODE_FORBIDDEN, "仅讲述者本人可删除口述");

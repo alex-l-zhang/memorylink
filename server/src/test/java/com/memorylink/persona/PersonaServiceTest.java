@@ -72,7 +72,7 @@ class PersonaServiceTest {
 
         assertThatThrownBy(() -> personaService.enable(1L, 1L))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("故人档案");
+                .hasMessageContaining("不支持本人开启");
     }
 
     @Test

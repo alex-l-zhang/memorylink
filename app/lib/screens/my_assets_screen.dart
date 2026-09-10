@@ -284,7 +284,7 @@ class _MyAssetsScreenState extends State<MyAssetsScreen> {
                         ..._consents.map((c) => ListTile(
                               dense: true,
                               leading: const Icon(Icons.verified_user_outlined),
-                              title: Text(c.consentType == 'PRE_AUTHORIZED' ? '故人生前预授权' : '两名近亲共同确认'),
+                              title: Text(c.consentType == 'PRE_AUTHORIZED' ? '本人生前预授权' : '两名近亲共同确认'),
                               subtitle: Text('记录 #${c.id} · 状态 ${c.status}'),
                             )),
                     ],

@@ -39,7 +39,7 @@ public class PersonaService {
         LovedOne lovedOne = lovedOneRepository.findById(lovedOneId)
                 .orElseThrow(() -> new BusinessException(CODE_ARCHIVE_NOT_FOUND, "档案不存在"));
         if (lovedOne.effectiveDeceased()) {
-            throw new BusinessException(CODE_REQUIRE_CONSENT, "该档案为故人档案，请由近亲属完成知情同意");
+            throw new BusinessException(CODE_REQUIRE_CONSENT, "该档案不支持本人开启 AI 讲述，请通过知情同意流程处理");
         }
         if (!userId.equals(lovedOne.getUserId())) {
             throw new BusinessException(CODE_NOT_BOUND_TO_SELF, "仅档案本人可开启 AI 讲述");
@@ -62,7 +62,7 @@ public class PersonaService {
         LovedOne lovedOne = lovedOneRepository.findById(lovedOneId)
                 .orElseThrow(() -> new BusinessException(CODE_ARCHIVE_NOT_FOUND, "档案不存在"));
         if (lovedOne.effectiveDeceased()) {
-            throw new BusinessException(CODE_REQUIRE_CONSENT, "故人档案请走知情同意/关闭流程");
+            throw new BusinessException(CODE_REQUIRE_CONSENT, "该档案请通过知情同意/关闭流程处理");
         }
         if (!userId.equals(lovedOne.getUserId())) {
             throw new BusinessException(CODE_NOT_BOUND_TO_SELF, "仅档案本人可关闭 AI 讲述");

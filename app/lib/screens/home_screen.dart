@@ -627,7 +627,12 @@ class _ClaimDialogState extends State<_ClaimDialog> {
                   .map((o) => DropdownMenuItem(value: o.code, child: Text(o.label)))
                   .toList(),
               onChanged: (value) {
-                if (value != null) setState(() => _relation = value);
+                if (value != null) {
+                  setState(() {
+                    _relation = value;
+                    _inverseRelation = suggestedInverse(value) ?? _inverseRelation;
+                  });
+                }
               },
             ),
             const SizedBox(height: 12),
@@ -638,8 +643,18 @@ class _ClaimDialogState extends State<_ClaimDialog> {
                   .map((o) => DropdownMenuItem(value: o.code, child: Text(o.label)))
                   .toList(),
               onChanged: (value) {
-                if (value != null) setState(() => _inverseRelation = value);
+                if (value != null) {
+                  setState(() {
+                    _inverseRelation = value;
+                    _relation = suggestedInverse(value) ?? _relation;
+                  });
+                }
               },
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '将提交：我是邀请人的${relationLabel(_relation)} · 邀请人是我的${relationLabel(_inverseRelation)}',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ],
           if (_querying) ...[

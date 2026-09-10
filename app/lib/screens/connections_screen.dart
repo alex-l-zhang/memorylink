@@ -179,7 +179,12 @@ class _SearchTabState extends State<_SearchTab> {
                 .map((o) => DropdownMenuItem(value: o.code, child: Text(o.label)))
                 .toList(),
             onChanged: (value) {
-              if (value != null) setState(() => _relation = value);
+              if (value != null) {
+                setState(() {
+                  _relation = value;
+                  _inverseRelation = suggestedInverse(value) ?? _inverseRelation;
+                });
+              }
             },
           ),
           const SizedBox(height: 12),
@@ -190,8 +195,18 @@ class _SearchTabState extends State<_SearchTab> {
                 .map((o) => DropdownMenuItem(value: o.code, child: Text(o.label)))
                 .toList(),
             onChanged: (value) {
-              if (value != null) setState(() => _inverseRelation = value);
+              if (value != null) {
+                setState(() {
+                  _inverseRelation = value;
+                  _relation = suggestedInverse(value) ?? _relation;
+                });
+              }
             },
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '将发送：TA 是我的${_relationLabel(_relation)} · 我是 TA 的${_relationLabel(_inverseRelation)}',
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
           ),
           const SizedBox(height: 12),
           FilledButton.icon(

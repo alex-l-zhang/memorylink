@@ -155,5 +155,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(api.connectionSent, isTrue);
+    // 发起成功后弹窗应立即关闭，只保留底部提示
+    expect(find.text('发起建立联系'), findsNothing);
+    expect(find.textContaining('等待对方同意'), findsOneWidget);
   });
 }

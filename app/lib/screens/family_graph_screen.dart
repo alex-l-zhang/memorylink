@@ -388,7 +388,11 @@ class _NodeCard extends StatelessWidget {
               ),
               if (node.extended) ...[
                 const SizedBox(width: 4),
-                Icon(Icons.link, size: 11, color: scheme.outline),
+                Icon(
+                  node.requestPending ? Icons.hourglass_top : Icons.link,
+                  size: 11,
+                  color: scheme.outline,
+                ),
               ],
             ],
           ),
@@ -406,7 +410,9 @@ class _NodeCard extends StatelessWidget {
       onHover: (_) => onHover(node),
       cursor: SystemMouseCursors.click,
       child: Tooltip(
-        message: '${node.name}（$relation）',
+        message: node.extended && node.requestPending
+            ? '${node.name}（$relation · 已发起，等待同意）'
+            : '${node.name}（$relation）',
         child: Opacity(
           opacity: node.pending || node.extended ? 0.6 : 1,
           child: GestureDetector(
@@ -523,9 +529,10 @@ class _ExtendedNodeSheet extends StatefulWidget {
 class _ExtendedNodeSheetState extends State<_ExtendedNodeSheet> {
   String _relation = 'FRIEND';
   bool _busy = false;
-  late bool _sent = widget.node.requestPending;
+  late final bool _sent = widget.node.requestPending;
 
   Future<void> _send() async {
+    final messenger = ScaffoldMessenger.of(context);
     setState(() => _busy = true);
     try {
       await widget.api.sendConnections(
@@ -534,8 +541,9 @@ class _ExtendedNodeSheetState extends State<_ExtendedNodeSheet> {
         relation: _relation,
       );
       if (!mounted) return;
-      setState(() => _sent = true);
-      ScaffoldMessenger.of(context).showSnackBar(
+      // 发起成功后立即关闭弹窗，只留底部提示条
+      Navigator.of(context).pop(true);
+      messenger.showSnackBar(
         SnackBar(content: Text('已向${widget.node.name}发起建立联系，等待对方同意')),
       );
     } on ApiException catch (e) {

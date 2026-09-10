@@ -174,7 +174,7 @@ class _SearchTabState extends State<_SearchTab> {
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             initialValue: _relation,
-            decoration: const InputDecoration(labelText: 'TA 是我的：', border: OutlineInputBorder()),
+            decoration: const InputDecoration(labelText: '我是你的：', border: OutlineInputBorder()),
             items: connectionRelationOptions
                 .map((o) => DropdownMenuItem(value: o.code, child: Text(o.label)))
                 .toList(),
@@ -190,7 +190,7 @@ class _SearchTabState extends State<_SearchTab> {
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             initialValue: _inverseRelation,
-            decoration: const InputDecoration(labelText: '我是 TA 的：', border: OutlineInputBorder()),
+            decoration: const InputDecoration(labelText: '你是我的：', border: OutlineInputBorder()),
             items: connectionRelationOptions
                 .map((o) => DropdownMenuItem(value: o.code, child: Text(o.label)))
                 .toList(),
@@ -205,7 +205,7 @@ class _SearchTabState extends State<_SearchTab> {
           ),
           const SizedBox(height: 12),
           Text(
-            '将发送：TA 是我的${_relationLabel(_relation)} · 我是 TA 的${_relationLabel(_inverseRelation)}',
+            '将发送：我是你的${_relationLabel(_relation)} · 你是我的${_relationLabel(_inverseRelation)}',
             style: const TextStyle(fontSize: 12, color: Colors.grey),
           ),
           const SizedBox(height: 12),
@@ -314,7 +314,7 @@ class _IncomingTabState extends State<_IncomingTab> {
                       style: const TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   Text('对方：${_birthText(item.birthYear, item.birthMonth)} · 籍贯：${item.birthPlace ?? '未填写'}'),
-                  Text('对方是我的${_relationLabel(item.inverseRelation ?? item.relation)}'),
+                  Text('对方是我的${_relationLabel(item.relation)}'),
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,

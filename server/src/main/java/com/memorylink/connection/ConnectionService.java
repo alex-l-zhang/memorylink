@@ -135,10 +135,13 @@ public class ConnectionService {
         FamilyRelationship relationship = new FamilyRelationship();
         relationship.setUserAId(requester.getId());
         relationship.setUserBId(userId);
-        relationship.setRelationAToB(RelationCatalog.normalizeLegacy(request.getRelation()));
-        relationship.setRelationBToA(request.getInverseRelation() == null
+        // A=发起人, B=被联系人
+        // relationAToB：B 是 A 的谁（"你是我的 X"）
+        // relationBToA：A 是 B 的谁（"我是你的 Y"）
+        relationship.setRelationAToB(request.getInverseRelation() == null
                 ? RelationCatalog.normalizeLegacy(inverse(request.getRelation()))
                 : RelationCatalog.normalizeLegacy(request.getInverseRelation()));
+        relationship.setRelationBToA(RelationCatalog.normalizeLegacy(request.getRelation()));
         relationship.setStatus("ACTIVE");
         relationshipRepository.save(relationship);
         request.setStatus("ACCEPTED");

@@ -8,6 +8,7 @@ import com.memorylink.family.Family;
 import com.memorylink.family.FamilyMember;
 import com.memorylink.family.FamilyMemberRepository;
 import com.memorylink.family.FamilyService;
+import com.memorylink.family.MemberProfileService;
 import com.memorylink.user.User;
 import com.memorylink.user.UserRepository;
 import java.time.Instant;
@@ -35,19 +36,22 @@ public class ConnectionService {
     private final FamilyService familyService;
     private final FamilyMemberRepository familyMemberRepository;
     private final AuditService auditService;
+    private final MemberProfileService memberProfileService;
 
     public ConnectionService(UserRepository userRepository,
                              ConnectionRequestRepository requestRepository,
                              FamilyRelationshipRepository relationshipRepository,
                              FamilyService familyService,
                              FamilyMemberRepository familyMemberRepository,
-                             AuditService auditService) {
+                             AuditService auditService,
+                             MemberProfileService memberProfileService) {
         this.userRepository = userRepository;
         this.requestRepository = requestRepository;
         this.relationshipRepository = relationshipRepository;
         this.familyService = familyService;
         this.familyMemberRepository = familyMemberRepository;
         this.auditService = auditService;
+        this.memberProfileService = memberProfileService;
     }
 
     @Transactional(readOnly = true)
@@ -125,6 +129,8 @@ public class ConnectionService {
             member.setRelationSource("CONNECTION_REQUEST");
             familyMemberRepository.save(member);
         }
+        memberProfileService.ensureMemberProfile(family.getId(), requester.getId());
+        memberProfileService.ensureMemberProfile(family.getId(), userId);
         FamilyRelationship relationship = new FamilyRelationship();
         relationship.setUserAId(requester.getId());
         relationship.setUserBId(userId);

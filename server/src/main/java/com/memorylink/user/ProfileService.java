@@ -1,6 +1,7 @@
 package com.memorylink.user;
 
 import com.memorylink.common.BusinessException;
+import com.memorylink.archive.LovedOneRepository;
 import com.memorylink.user.dto.ProfileResponse;
 import com.memorylink.user.dto.ProfileUpdateRequest;
 import org.springframework.stereotype.Service;
@@ -12,9 +13,11 @@ public class ProfileService {
     public static final int CODE_USER_NOT_FOUND = 3003;
 
     private final UserRepository userRepository;
+    private final LovedOneRepository lovedOneRepository;
 
-    public ProfileService(UserRepository userRepository) {
+    public ProfileService(UserRepository userRepository, LovedOneRepository lovedOneRepository) {
         this.userRepository = userRepository;
+        this.lovedOneRepository = lovedOneRepository;
     }
 
     @Transactional(readOnly = true)
@@ -35,6 +38,15 @@ public class ProfileService {
             user.setBirthPlace(request.birthPlace().trim());
         }
         userRepository.save(user);
+        // 同步本人在各家族的成员档案卡（姓名/出生年月/籍贯）
+        for (var person : lovedOneRepository.findByUserId(userId)) {
+            if (!person.effectiveDeceased()) {
+                person.setName(user.getName());
+                person.setBirthDate(user.getBirthDate());
+                person.setBirthPlace(user.getBirthPlace());
+                lovedOneRepository.save(person);
+            }
+        }
         return toResponse(user);
     }
 

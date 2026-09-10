@@ -8,6 +8,7 @@ import com.memorylink.common.BusinessException;
 import com.memorylink.family.FamilyMember;
 import com.memorylink.family.FamilyMemberRepository;
 import com.memorylink.family.FamilyService;
+import com.memorylink.family.MemberProfileService;
 import com.memorylink.invite.dto.ClaimResponse;
 import com.memorylink.invite.dto.InviteKeyResponse;
 import com.memorylink.invite.dto.InviteInfoResponse;
@@ -36,6 +37,7 @@ public class InviteService {
             Set.of("SPOUSE", "CHILD", "GRANDCHILD", "SIBLING", "FRIEND", "OTHER");
 
     private final com.memorylink.user.UserRepository userRepository;
+    private final MemberProfileService memberProfileService;
 
     private final InviteKeyRepository inviteKeyRepository;
     private final LovedOneRepository lovedOneRepository;
@@ -49,13 +51,15 @@ public class InviteService {
                          FamilyService familyService,
                          FamilyMemberRepository familyMemberRepository,
                          AuditLogRepository auditLogRepository,
-                         com.memorylink.user.UserRepository userRepository) {
+                         com.memorylink.user.UserRepository userRepository,
+                         MemberProfileService memberProfileService) {
         this.inviteKeyRepository = inviteKeyRepository;
         this.lovedOneRepository = lovedOneRepository;
         this.familyService = familyService;
         this.familyMemberRepository = familyMemberRepository;
         this.auditLogRepository = auditLogRepository;
         this.userRepository = userRepository;
+        this.memberProfileService = memberProfileService;
     }
 
     @Transactional
@@ -118,6 +122,8 @@ public class InviteService {
         member.setEvidenceStatus("SELF_DECLARED");
         member.setRelationSource("INVITE_KEY");
         familyMemberRepository.save(member);
+        memberProfileService.ensureMemberProfile(lovedOne.getFamilyId(), key.getCreatedBy());
+        memberProfileService.ensureMemberProfile(lovedOne.getFamilyId(), userId);
 
         key.setUsedCount(key.getUsedCount() + 1);
         if (key.getUsedCount() >= key.getMaxUses()) {

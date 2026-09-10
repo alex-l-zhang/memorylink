@@ -16,6 +16,7 @@ import com.memorylink.common.BusinessException;
 import com.memorylink.family.FamilyMember;
 import com.memorylink.family.FamilyMemberRepository;
 import com.memorylink.family.FamilyService;
+import com.memorylink.family.MemberProfileService;
 import com.memorylink.invite.dto.ClaimResponse;
 import com.memorylink.invite.dto.InviteKeyResponse;
 import java.time.Instant;
@@ -42,13 +43,16 @@ class InviteServiceTest {
     private AuditLogRepository auditLogRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private MemberProfileService memberProfileService;
 
     private InviteService service;
 
     @BeforeEach
     void setUp() {
         service = new InviteService(inviteKeyRepository, lovedOneRepository,
-                familyService, familyMemberRepository, auditLogRepository, userRepository);
+                familyService, familyMemberRepository, auditLogRepository, userRepository,
+                memberProfileService);
     }
 
     private LovedOne lovedOne(Long familyId) {

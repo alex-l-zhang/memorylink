@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.memorylink.user.dto.ProfileResponse;
 import com.memorylink.user.dto.ProfileUpdateRequest;
+import com.memorylink.archive.LovedOneRepository;
 import java.time.LocalDate;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,12 +20,14 @@ class ProfileServiceTest {
 
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private LovedOneRepository lovedOneRepository;
 
     private ProfileService profileService;
 
     @BeforeEach
     void setUp() {
-        profileService = new ProfileService(userRepository);
+        profileService = new ProfileService(userRepository, lovedOneRepository);
     }
 
     @Test

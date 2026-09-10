@@ -18,6 +18,8 @@ public interface LovedOneRepository extends JpaRepository<LovedOne, Long> {
 
     Optional<LovedOne> findFirstByUserIdOrderByIdAsc(Long userId);
 
+    Optional<LovedOne> findFirstByFamilyIdAndUserId(Long familyId, Long userId);
+
     List<LovedOne> findByUserId(Long userId);
 
     List<LovedOne> findByCreatedBy(Long userId);

@@ -10,6 +10,7 @@ import com.memorylink.connection.dto.UserCandidateResponse;
 import com.memorylink.family.Family;
 import com.memorylink.family.FamilyMemberRepository;
 import com.memorylink.family.FamilyService;
+import com.memorylink.family.MemberProfileService;
 import com.memorylink.user.User;
 import com.memorylink.user.UserRepository;
 import java.time.LocalDate;
@@ -36,13 +37,15 @@ class ConnectionServiceTest {
     private FamilyMemberRepository familyMemberRepository;
     @Mock
     private AuditService auditService;
+    @Mock
+    private MemberProfileService memberProfileService;
 
     private ConnectionService service;
 
     @BeforeEach
     void setUp() {
         service = new ConnectionService(userRepository, requestRepository, relationshipRepository,
-                familyService, familyMemberRepository, auditService);
+                familyService, familyMemberRepository, auditService, memberProfileService);
     }
 
     private User user(Long id, String name, String birth, String place) {

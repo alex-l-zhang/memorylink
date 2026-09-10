@@ -92,6 +92,7 @@ class LovedOneServiceTest {
         existing.setName("张爷爷");
         when(lovedOneRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(familyService.canAccess(1L, 9L)).thenReturn(true);
+        when(familyService.canManage(1L, 9L)).thenReturn(true);
         when(lovedOneRepository.save(any(LovedOne.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         LovedOneResponse response = service.update(1L, 1L,
@@ -99,6 +100,37 @@ class LovedOneServiceTest {
 
         assertThat(response.birthPlace()).isEqualTo("浙江绍兴");
         assertThat(response.bio()).isEqualTo("补充的生平");
+    }
+
+    @Test
+    void updateOtherMembersBoundProfileDenied() {
+        LovedOne other = new LovedOne();
+        other.setId(1L);
+        other.setFamilyId(9L);
+        other.setUserId(2L);
+        when(lovedOneRepository.findById(1L)).thenReturn(Optional.of(other));
+        when(familyService.canAccess(1L, 9L)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.update(1L, 1L,
+                new LovedOneRequest("改名", null, null, null, null)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("仅本人");
+    }
+
+    @Test
+    void updateDeceasedByNonManagerDenied() {
+        LovedOne deceased = new LovedOne();
+        deceased.setId(1L);
+        deceased.setFamilyId(9L);
+        deceased.setDeathDate(LocalDate.of(2020, 1, 1));
+        when(lovedOneRepository.findById(1L)).thenReturn(Optional.of(deceased));
+        when(familyService.canAccess(1L, 9L)).thenReturn(true);
+        when(familyService.canManage(1L, 9L)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.update(1L, 1L,
+                new LovedOneRequest("改名", null, LocalDate.of(2020, 1, 1), null, null)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("仅家族创建者/共建者");
     }
 
     @Test

@@ -84,6 +84,14 @@ public class LovedOneService {
     @Transactional
     public LovedOneResponse update(Long userId, Long id, LovedOneRequest request) {
         LovedOne lovedOne = requireAccess(userId, id);
+        boolean boundToUser = lovedOne.getUserId() != null;
+        if (!lovedOne.effectiveDeceased() && boundToUser) {
+            if (!userId.equals(lovedOne.getUserId())) {
+                throw new BusinessException(CODE_FORBIDDEN, "仅本人可编辑自己的资料");
+            }
+        } else if (!familyService.canManage(userId, lovedOne.getFamilyId())) {
+            throw new BusinessException(CODE_FORBIDDEN, "仅家族创建者/共建者可编辑该资料");
+        }
         lovedOne.setName(request.name());
         lovedOne.setBirthDate(request.birthDate());
         lovedOne.setDeathDate(request.deathDate());

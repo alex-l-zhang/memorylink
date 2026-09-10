@@ -169,6 +169,17 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
   bool get _isOralSelf =>
       !_current.isEffectivelyDeceased && _current.userId == widget.userId;
 
+  bool get _isFamilyManager => _members.any((m) =>
+      m.userId == widget.userId && (m.role == 'OWNER' || m.role == 'EDITOR'));
+
+  /// 在世且绑定本人账号的资料仅本人可编辑；其余由家族创建者/共建者维护
+  bool get _canEditPerson {
+    if (!_current.isEffectivelyDeceased && _current.userId != null) {
+      return _current.userId == widget.userId;
+    }
+    return _isFamilyManager;
+  }
+
   bool get _isOralManager => _current.isEffectivelyDeceased
       ? _members.any((m) =>
           m.userId == widget.userId && (m.role == 'OWNER' || m.role == 'EDITOR'))
@@ -283,17 +294,21 @@ class _ArchiveDetailScreenState extends State<ArchiveDetailScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _editing
-                    ? FilledButton.tonalIcon(
-                        onPressed: _saving ? null : _save,
-                        icon: const Icon(Icons.save_outlined),
-                        label: Text(_saving ? '保存中…' : '保存修改'),
+                child: !_canEditPerson
+                    ? const Center(
+                        child: Text('资料由本人维护', style: TextStyle(color: Colors.grey)),
                       )
-                    : OutlinedButton.icon(
-                        onPressed: () => setState(() => _editing = true),
-                        icon: const Icon(Icons.edit_outlined),
-                        label: const Text('编辑资料'),
-                      ),
+                    : _editing
+                        ? FilledButton.tonalIcon(
+                            onPressed: _saving ? null : _save,
+                            icon: const Icon(Icons.save_outlined),
+                            label: Text(_saving ? '保存中…' : '保存修改'),
+                          )
+                        : OutlinedButton.icon(
+                            onPressed: () => setState(() => _editing = true),
+                            icon: const Icon(Icons.edit_outlined),
+                            label: const Text('编辑资料'),
+                          ),
               ),
             ],
           ),

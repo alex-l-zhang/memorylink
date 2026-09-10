@@ -41,6 +41,7 @@ void main() {
       name: '张爷爷',
       birthDate: '1940-01-01',
       birthPlace: '上海',
+      userId: 1,
     );
     await tester.pumpWidget(
       MaterialApp(

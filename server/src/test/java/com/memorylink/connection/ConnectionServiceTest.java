@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.ArgumentCaptor;
 
 @ExtendWith(MockitoExtension.class)
 class ConnectionServiceTest {
@@ -93,14 +94,20 @@ class ConnectionServiceTest {
         when(requestRepository.findByIdAndTargetIdAndStatus(10L, 2L, "PENDING"))
                 .thenReturn(Optional.of(request));
         when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "李四", null, null)));
+        User acceptor = user(2L, "张三", "1990-01-01", "上海");
+        acceptor.setGender("FEMALE");
+        when(userRepository.findById(2L)).thenReturn(Optional.of(acceptor));
         Family family = new Family();
         family.setId(9L);
         when(familyService.getOrCreateDefaultFamily(1L, "李四")).thenReturn(family);
         when(familyMemberRepository.existsByFamilyIdAndUserId(9L, 2L)).thenReturn(false);
 
-        service.accept(2L, 10L);
+        service.accept(2L, 10L, null);
 
-        verify(relationshipRepository).save(any(FamilyRelationship.class));
+        ArgumentCaptor<FamilyRelationship> captor = ArgumentCaptor.forClass(FamilyRelationship.class);
+        verify(relationshipRepository).save(captor.capture());
+        // 发起人自称是对方的子女（CHILD→SON），接收方为女性 → 反向自动为母亲
+        assertThat(captor.getValue().getRelationAToB()).isEqualTo("MOTHER");
         verify(familyMemberRepository).save(any());
         assertThat(request.getStatus()).isEqualTo("ACCEPTED");
     }

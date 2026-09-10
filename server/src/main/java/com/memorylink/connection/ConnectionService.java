@@ -136,20 +136,23 @@ public class ConnectionService {
     }
 
     @Transactional
-    public void accept(Long userId, Long requestId) {
+    public void accept(Long userId, Long requestId, String inverseOverride) {
         ConnectionRequest request = requestRepository
                 .findByIdAndTargetIdAndStatus(requestId, userId, "PENDING")
                 .orElseThrow(() -> new BusinessException(CODE_INVALID, "请求不存在或已处理"));
         User requester = userRepository.findById(request.getRequesterId())
                 .orElseThrow(() -> new BusinessException(CODE_USER_NOT_FOUND, "发起人不存在"));
+        User acceptor = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(CODE_USER_NOT_FOUND, "用户不存在"));
+        String finalInverse = resolveInverse(request.getRelation(),
+                inverseOverride != null ? inverseOverride : request.getInverseRelation(),
+                acceptor.getGender());
         Family family = familyService.getOrCreateDefaultFamily(requester.getId(), requester.getName());
         if (!familyMemberRepository.existsByFamilyIdAndUserId(family.getId(), userId)) {
             FamilyMember member = new FamilyMember();
             member.setFamilyId(family.getId());
             member.setUserId(userId);
-            member.setRelation(request.getInverseRelation() == null
-                    ? RelationCatalog.normalizeLegacy(inverse(request.getRelation()))
-                    : request.getInverseRelation());
+            member.setRelation(finalInverse);
             member.setRole("VIEWER");
             member.setStatus("ACTIVE");
             member.setEvidenceStatus("SELF_DECLARED");
@@ -164,14 +167,13 @@ public class ConnectionService {
         // A=发起人, B=被联系人
         // relationAToB：B 是 A 的谁（"你是我的 X"）
         // relationBToA：A 是 B 的谁（"我是你的 Y"）
-        relationship.setRelationAToB(request.getInverseRelation() == null
-                ? RelationCatalog.normalizeLegacy(inverse(request.getRelation()))
-                : RelationCatalog.normalizeLegacy(request.getInverseRelation()));
+        relationship.setRelationAToB(finalInverse);
         relationship.setRelationBToA(RelationCatalog.normalizeLegacy(request.getRelation()));
         relationship.setStatus("ACTIVE");
         relationshipRepository.save(relationship);
         request.setStatus("ACCEPTED");
         request.setRespondedAt(Instant.now());
+        request.setInverseRelation(finalInverse);
         requestRepository.save(request);
         auditService.log("USER", userId, "CONNECTION_ACCEPTED", "connection:" + requestId,
                 Map.of("requesterId", requester.getId()));
@@ -217,6 +219,30 @@ public class ConnectionService {
             case "GRANDPARENT" -> "GRANDCHILD";
             case "GRANDCHILD" -> "GRANDPARENT";
             default -> relation;
+        };
+    }
+
+    /**
+     * 反向关系解析：优先用户确认值；否则按接收方性别自动推断；再否则使用原值/兜底。
+     */
+    private String resolveInverse(String relation, String stored, String acceptorGender) {
+        String base = RelationCatalog.normalizeLegacy(stored);
+        String rel = RelationCatalog.normalizeLegacy(relation);
+        if (acceptorGender == null) {
+            return base;
+        }
+        boolean male = "MALE".equalsIgnoreCase(acceptorGender);
+        return switch (rel) {
+            case "SON", "DAUGHTER" -> male ? "FATHER" : "MOTHER";
+            case "FATHER", "MOTHER" -> male ? "SON" : "DAUGHTER";
+            case "GRANDSON", "GRANDDAUGHTER", "GRANDSON_DAUGHTER", "GRANDDAUGHTER_DAUGHTER" ->
+                    male
+                            ? (rel.contains("DAUGHTER_") ? "GRANDFATHER_MATERNAL" : "GRANDFATHER_PATERNAL")
+                            : (rel.contains("DAUGHTER_") ? "GRANDMOTHER_MATERNAL" : "GRANDMOTHER_PATERNAL");
+            case "GRANDFATHER_PATERNAL", "GRANDMOTHER_PATERNAL",
+                 "GRANDFATHER_MATERNAL", "GRANDMOTHER_MATERNAL" ->
+                    male ? "GRANDSON" : "GRANDDAUGHTER";
+            default -> base;
         };
     }
 

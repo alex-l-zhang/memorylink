@@ -201,8 +201,12 @@ class ApiClient {
         .toList();
   }
 
-  Future<void> acceptConnection(String token, int requestId) async {
-    await _post('/api/v1/connections/requests/$requestId/accept', const {}, token: token);
+  Future<void> acceptConnection(String token, int requestId, {String? inverseRelation}) async {
+    await _post(
+      '/api/v1/connections/requests/$requestId/accept',
+      {'inverseRelation': inverseRelation},
+      token: token,
+    );
   }
 
   Future<void> rejectConnection(String token, int requestId) async {

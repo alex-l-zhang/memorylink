@@ -38,6 +38,9 @@ public final class RelationCatalog {
     }
 
     public static String normalizeLegacy(String code) {
+        if (code == null) {
+            return null;
+        }
         return LEGACY_GENERIC.getOrDefault(code, code);
     }
 }

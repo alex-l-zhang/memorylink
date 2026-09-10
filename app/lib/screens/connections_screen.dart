@@ -248,7 +248,38 @@ class _IncomingTabState extends State<_IncomingTab> {
   Future<void> _respond(ConnectionRequestItem item, bool accept) async {
     try {
       if (accept) {
-        await widget.api.acceptConnection(widget.token, item.id);
+        String? inverse;
+        final choices = _inverseChoices(item.relation);
+        if (choices.isNotEmpty) {
+          String? gender;
+          try {
+            gender = (await widget.api.me(widget.token)).gender;
+          } catch (_) {
+            gender = null;
+          }
+          if (!mounted) return;
+          final suggestion = _defaultInverse(choices, gender);
+          inverse = await showDialog<String>(
+            context: context,
+            builder: (dialogContext) => SimpleDialog(
+              title: const Text('你与对方的关系'),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                  child: Text('对方说"我是你的${_relationLabel(item.relation)}"，请确认你是对方的：',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                ),
+                ...choices.map((code) => SimpleDialogOption(
+                      onPressed: () => Navigator.pop(dialogContext, code),
+                      child: Text('我是对方的${_relationLabel(code)}'
+                          '${code == suggestion ? '（推荐）' : ''}'),
+                    )),
+              ],
+            ),
+          );
+          if (inverse == null) return;
+        }
+        await widget.api.acceptConnection(widget.token, item.id, inverseRelation: inverse);
       } else {
         await widget.api.rejectConnection(widget.token, item.id);
       }
@@ -263,6 +294,41 @@ class _IncomingTabState extends State<_IncomingTab> {
             const SnackBar(content: Text('操作失败，请稍后重试')));
       }
     }
+  }
+
+  List<String> _inverseChoices(String relation) {
+    switch (relation) {
+      case 'SON':
+      case 'DAUGHTER':
+        return const ['FATHER', 'MOTHER'];
+      case 'FATHER':
+      case 'MOTHER':
+        return const ['SON', 'DAUGHTER'];
+      case 'GRANDSON':
+      case 'GRANDDAUGHTER':
+        return const ['GRANDFATHER_PATERNAL', 'GRANDMOTHER_PATERNAL'];
+      case 'GRANDSON_DAUGHTER':
+      case 'GRANDDAUGHTER_DAUGHTER':
+        return const ['GRANDFATHER_MATERNAL', 'GRANDMOTHER_MATERNAL'];
+      default:
+        return const [];
+    }
+  }
+
+  String _defaultInverse(List<String> choices, String? gender) {
+    if (gender == 'MALE') {
+      return choices.firstWhere(
+        (c) => c == 'FATHER' || c == 'SON' || c.startsWith('GRANDFATHER'),
+        orElse: () => choices.first,
+      );
+    }
+    if (gender == 'FEMALE') {
+      return choices.firstWhere(
+        (c) => c == 'MOTHER' || c == 'DAUGHTER' || c.startsWith('GRANDMOTHER'),
+        orElse: () => choices.first,
+      );
+    }
+    return choices.first;
   }
 
   @override

@@ -3,6 +3,7 @@ package com.memorylink.connection;
 import com.memorylink.common.ApiResponse;
 import com.memorylink.connection.dto.ConnectionRequestResponse;
 import com.memorylink.connection.dto.ConnectionHistoryResponse;
+import com.memorylink.connection.dto.AcceptConnectionRequest;
 import com.memorylink.connection.dto.SendConnectionRequest;
 import com.memorylink.connection.dto.UserCandidateResponse;
 import com.memorylink.security.SecurityUtils;
@@ -56,8 +57,10 @@ public class ConnectionController {
     }
 
     @PostMapping("/requests/{requestId}/accept")
-    public ApiResponse<Void> accept(@PathVariable Long requestId) {
-        connectionService.accept(SecurityUtils.currentUser().userId(), requestId);
+    public ApiResponse<Void> accept(@PathVariable Long requestId,
+                                    @RequestBody(required = false) AcceptConnectionRequest request) {
+        connectionService.accept(SecurityUtils.currentUser().userId(), requestId,
+                request == null ? null : request.inverseRelation());
         return ApiResponse.ok(null);
     }
 

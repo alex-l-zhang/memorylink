@@ -312,6 +312,8 @@ class _ProfileDialog extends StatefulWidget {
 class _ProfileDialogState extends State<_ProfileDialog> {
   late final TextEditingController _name;
   late final TextEditingController _birthDate;
+  late final TextEditingController _birthPlace;
+  String? _gender;
   bool _saving = false;
   String? _error;
 
@@ -320,12 +322,15 @@ class _ProfileDialogState extends State<_ProfileDialog> {
     super.initState();
     _name = TextEditingController(text: widget.profile?.name ?? '');
     _birthDate = TextEditingController(text: widget.profile?.birthDate ?? '');
+    _birthPlace = TextEditingController(text: widget.profile?.birthPlace ?? '');
+    _gender = widget.profile?.gender;
   }
 
   @override
   void dispose() {
     _name.dispose();
     _birthDate.dispose();
+    _birthPlace.dispose();
     super.dispose();
   }
 
@@ -344,6 +349,8 @@ class _ProfileDialogState extends State<_ProfileDialog> {
         widget.token,
         name: _name.text.trim(),
         birthDate: birthText.isEmpty ? null : birthText,
+        birthPlace: _birthPlace.text.trim(),
+        gender: _gender,
       );
       if (!mounted) return;
       Navigator.of(context).pop(updated);
@@ -374,6 +381,23 @@ class _ProfileDialogState extends State<_ProfileDialog> {
               labelText: '出生日期（YYYY-MM-DD）',
               border: OutlineInputBorder(),
             ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _birthPlace,
+            decoration: const InputDecoration(labelText: '籍贯', border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            initialValue: _gender ?? '',
+            decoration: const InputDecoration(labelText: '性别', border: OutlineInputBorder()),
+            items: const [
+              DropdownMenuItem(value: '', child: Text('不填')),
+              DropdownMenuItem(value: 'MALE', child: Text('男')),
+              DropdownMenuItem(value: 'FEMALE', child: Text('女')),
+              DropdownMenuItem(value: 'OTHER', child: Text('其他')),
+            ],
+            onChanged: (value) => setState(() => _gender = (value == null || value.isEmpty) ? null : value),
           ),
           if (_error != null) ...[
             const SizedBox(height: 8),

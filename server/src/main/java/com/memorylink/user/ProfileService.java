@@ -37,6 +37,9 @@ public class ProfileService {
         if (request.birthPlace() != null && !request.birthPlace().isBlank()) {
             user.setBirthPlace(request.birthPlace().trim());
         }
+        if (request.gender() != null && !request.gender().isBlank()) {
+            user.setGender(request.gender().trim().toUpperCase());
+        }
         userRepository.save(user);
         // 同步本人在各家族的成员档案卡（姓名/出生年月/籍贯）
         for (var person : lovedOneRepository.findByUserId(userId)) {
@@ -57,6 +60,6 @@ public class ProfileService {
 
     private ProfileResponse toResponse(User user) {
         return new ProfileResponse(user.getId(), user.getPhone(), user.getName(),
-                user.getBirthDate(), user.getBirthPlace());
+                user.getBirthDate(), user.getBirthPlace(), user.getGender());
     }
 }

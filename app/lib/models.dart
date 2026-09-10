@@ -92,14 +92,25 @@ class UserProfile {
   final String phone;
   final String name;
   final String? birthDate;
+  final String? birthPlace;
+  final String? gender;
 
-  UserProfile({required this.id, required this.phone, required this.name, this.birthDate});
+  UserProfile({
+    required this.id,
+    required this.phone,
+    required this.name,
+    this.birthDate,
+    this.birthPlace,
+    this.gender,
+  });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
         id: (json['id'] as num).toInt(),
         phone: json['phone'] as String? ?? '',
         name: json['name'] as String? ?? '',
         birthDate: json['birthDate'] as String?,
+        birthPlace: json['birthPlace'] as String?,
+        gender: json['gender'] as String?,
       );
 }
 

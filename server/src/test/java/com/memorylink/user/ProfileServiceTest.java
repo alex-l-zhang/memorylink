@@ -40,10 +40,11 @@ class ProfileServiceTest {
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ProfileResponse response = profileService.update(1L,
-                new ProfileUpdateRequest("新名", LocalDate.of(1990, 5, 1), "上海"));
+                new ProfileUpdateRequest("新名", LocalDate.of(1990, 5, 1), "上海", "MALE"));
 
         assertThat(response.name()).isEqualTo("新名");
         assertThat(response.birthDate()).isEqualTo(LocalDate.of(1990, 5, 1));
         assertThat(response.birthPlace()).isEqualTo("上海");
+        assertThat(response.gender()).isEqualTo("MALE");
     }
 }

@@ -1,6 +1,7 @@
 package com.memorylink.user.dto;
 
 import jakarta.validation.constraints.PastOrPresent;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 
@@ -12,6 +13,9 @@ public record ProfileUpdateRequest(
         LocalDate birthDate,
 
         @Size(max = 100, message = "籍贯过长")
-        String birthPlace
+        String birthPlace,
+
+        @Pattern(regexp = "MALE|FEMALE|OTHER", message = "性别仅支持 MALE/FEMALE/OTHER")
+        String gender
 ) {
 }

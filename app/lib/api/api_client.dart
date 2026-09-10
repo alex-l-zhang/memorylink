@@ -204,10 +204,14 @@ class ApiClient {
     String token, {
     String? name,
     String? birthDate,
+    String? birthPlace,
+    String? gender,
   }) async {
     final data = await _patch('/api/v1/users/me', {
       'name': name == null || name.isEmpty ? null : name,
       'birthDate': birthDate == null || birthDate.isEmpty ? null : birthDate,
+      'birthPlace': birthPlace == null || birthPlace.isEmpty ? null : birthPlace,
+      'gender': gender == null || gender.isEmpty ? null : gender,
     }, token: token);
     return UserProfile.fromJson(data as Map<String, dynamic>);
   }

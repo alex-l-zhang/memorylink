@@ -7,6 +7,7 @@ public record ProfileResponse(
         String phone,
         String name,
         LocalDate birthDate,
-        String birthPlace
+        String birthPlace,
+        String gender
 ) {
 }

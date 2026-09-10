@@ -4,6 +4,7 @@ import com.memorylink.common.ApiResponse;
 import com.memorylink.connection.dto.ConnectionRequestResponse;
 import com.memorylink.connection.dto.ConnectionHistoryResponse;
 import com.memorylink.connection.dto.AcceptConnectionRequest;
+import com.memorylink.connection.dto.RelationshipResponse;
 import com.memorylink.connection.dto.SendConnectionRequest;
 import com.memorylink.connection.dto.UserCandidateResponse;
 import com.memorylink.security.SecurityUtils;
@@ -11,6 +12,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -54,6 +56,17 @@ public class ConnectionController {
     @GetMapping("/requests/outgoing")
     public ApiResponse<List<ConnectionHistoryResponse>> outgoing() {
         return ApiResponse.ok(connectionService.outgoing(SecurityUtils.currentUser().userId()));
+    }
+
+    @GetMapping("/relationships")
+    public ApiResponse<List<RelationshipResponse>> relationships() {
+        return ApiResponse.ok(connectionService.relationships(SecurityUtils.currentUser().userId()));
+    }
+
+    @DeleteMapping("/relationships/{relationshipId}")
+    public ApiResponse<Void> removeRelationship(@PathVariable Long relationshipId) {
+        connectionService.removeRelationship(SecurityUtils.currentUser().userId(), relationshipId);
+        return ApiResponse.ok(null);
     }
 
     @PostMapping("/requests/{requestId}/accept")

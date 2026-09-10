@@ -15,6 +15,9 @@ import com.memorylink.family.FamilyService;
 import com.memorylink.family.MemberProfileService;
 import com.memorylink.user.User;
 import com.memorylink.user.UserRepository;
+import com.memorylink.archive.LovedOne;
+import com.memorylink.archive.LovedOneRepository;
+import com.memorylink.family.FamilyRepository;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -42,13 +45,18 @@ class ConnectionServiceTest {
     private AuditService auditService;
     @Mock
     private MemberProfileService memberProfileService;
+    @Mock
+    private LovedOneRepository lovedOneRepository;
+    @Mock
+    private FamilyRepository familyRepository;
 
     private ConnectionService service;
 
     @BeforeEach
     void setUp() {
         service = new ConnectionService(userRepository, requestRepository, relationshipRepository,
-                familyService, familyMemberRepository, auditService, memberProfileService);
+                familyService, familyMemberRepository, auditService, memberProfileService,
+                lovedOneRepository, familyRepository);
     }
 
     private User user(Long id, String name, String birth, String place) {
@@ -146,5 +154,59 @@ class ConnectionServiceTest {
         assertThatThrownBy(() -> service.accept(2L, 12L, null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("请选择你与对方的关系");
+    }
+
+    @Test
+    void relationshipsListMapsMyPerspective() {
+        FamilyRelationship relationship = new FamilyRelationship();
+        relationship.setId(5L);
+        relationship.setUserAId(2L);
+        relationship.setUserBId(1L);
+        relationship.setRelationAToB("SON");
+        relationship.setRelationBToA("FATHER");
+        relationship.setStatus("ACTIVE");
+        when(relationshipRepository.findByUserBId(1L)).thenReturn(List.of(relationship));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user(2L, "张三", null, null)));
+
+        var list = service.relationships(1L);
+
+        assertThat(list).hasSize(1);
+        assertThat(list.get(0).otherName()).isEqualTo("张三");
+        assertThat(list.get(0).relationFromMe()).isEqualTo("FATHER");
+        assertThat(list.get(0).relationFromOther()).isEqualTo("SON");
+    }
+
+    @Test
+    void removeRelationshipCleansMembershipAndCard() {
+        FamilyRelationship relationship = new FamilyRelationship();
+        relationship.setId(5L);
+        relationship.setUserAId(1L);
+        relationship.setUserBId(2L);
+        relationship.setStatus("ACTIVE");
+        when(relationshipRepository.findById(5L)).thenReturn(Optional.of(relationship));
+        com.memorylink.family.Family family = new com.memorylink.family.Family();
+        family.setId(9L);
+        when(familyRepository.findFirstByCreatorIdOrderByIdAsc(1L)).thenReturn(Optional.of(family));
+        com.memorylink.family.FamilyMember member = new com.memorylink.family.FamilyMember();
+        member.setFamilyId(9L);
+        member.setUserId(2L);
+        member.setRelationSource("CONNECTION_REQUEST");
+        when(familyMemberRepository.findByFamilyIdAndUserId(9L, 2L)).thenReturn(Optional.of(member));
+        LovedOne card = new LovedOne();
+        card.setId(7L);
+        card.setFamilyId(9L);
+        card.setUserId(2L);
+        when(lovedOneRepository.findFirstByFamilyIdAndUserId(9L, 2L)).thenReturn(Optional.of(card));
+        when(lovedOneRepository.findByUserId(2L)).thenReturn(List.of());
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user(2L, "张三", null, null)));
+        com.memorylink.family.Family ownFamily = new com.memorylink.family.Family();
+        ownFamily.setId(11L);
+        when(familyService.getOrCreateDefaultFamily(2L, "张三")).thenReturn(ownFamily);
+
+        service.removeRelationship(1L, 5L);
+
+        verify(familyMemberRepository).delete(member);
+        verify(lovedOneRepository).delete(card);
+        assertThat(relationship.getStatus()).isEqualTo("REMOVED");
     }
 }

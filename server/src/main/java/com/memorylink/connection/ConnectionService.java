@@ -4,6 +4,9 @@ import com.memorylink.audit.AuditService;
 import com.memorylink.common.BusinessException;
 import com.memorylink.connection.dto.ConnectionRequestResponse;
 import com.memorylink.connection.dto.ConnectionHistoryResponse;
+import com.memorylink.connection.dto.RelationshipResponse;
+import com.memorylink.archive.LovedOneRepository;
+import com.memorylink.family.FamilyRepository;
 import com.memorylink.connection.dto.UserCandidateResponse;
 import com.memorylink.family.Family;
 import com.memorylink.family.FamilyMember;
@@ -28,6 +31,7 @@ public class ConnectionService {
     public static final int CODE_USER_NOT_FOUND = 3003;
     public static final int CODE_ALREADY = 3008;
     public static final int CODE_INVERSE_REQUIRED = 3009;
+    public static final int CODE_FORBIDDEN = 4001;
 
     private final UserRepository userRepository;
     private final ConnectionRequestRepository requestRepository;
@@ -36,6 +40,8 @@ public class ConnectionService {
     private final FamilyMemberRepository familyMemberRepository;
     private final AuditService auditService;
     private final MemberProfileService memberProfileService;
+    private final LovedOneRepository lovedOneRepository;
+    private final FamilyRepository familyRepository;
 
     public ConnectionService(UserRepository userRepository,
                              ConnectionRequestRepository requestRepository,
@@ -43,7 +49,9 @@ public class ConnectionService {
                              FamilyService familyService,
                              FamilyMemberRepository familyMemberRepository,
                              AuditService auditService,
-                             MemberProfileService memberProfileService) {
+                             MemberProfileService memberProfileService,
+                             LovedOneRepository lovedOneRepository,
+                             FamilyRepository familyRepository) {
         this.userRepository = userRepository;
         this.requestRepository = requestRepository;
         this.relationshipRepository = relationshipRepository;
@@ -51,6 +59,8 @@ public class ConnectionService {
         this.familyMemberRepository = familyMemberRepository;
         this.auditService = auditService;
         this.memberProfileService = memberProfileService;
+        this.lovedOneRepository = lovedOneRepository;
+        this.familyRepository = familyRepository;
     }
 
     @Transactional(readOnly = true)
@@ -135,6 +145,66 @@ public class ConnectionService {
                             request.getRespondedAt());
                 })
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<RelationshipResponse> relationships(Long userId) {
+        List<FamilyRelationship> all = new java.util.ArrayList<>();
+        all.addAll(relationshipRepository.findByUserAId(userId));
+        all.addAll(relationshipRepository.findByUserBId(userId));
+        return all.stream()
+                .filter(r -> "ACTIVE".equals(r.getStatus()))
+                .map(r -> {
+                    boolean asA = r.getUserAId().equals(userId);
+                    Long otherId = asA ? r.getUserBId() : r.getUserAId();
+                    String otherName = userRepository.findById(otherId)
+                            .map(User::getName).orElse("已注销用户");
+                    return new RelationshipResponse(
+                            r.getId(),
+                            otherId,
+                            otherName,
+                            asA ? r.getRelationAToB() : r.getRelationBToA(),
+                            asA ? r.getRelationBToA() : r.getRelationAToB());
+                })
+                .toList();
+    }
+
+    @Transactional
+    public void removeRelationship(Long userId, Long relationshipId) {
+        FamilyRelationship relationship = relationshipRepository.findById(relationshipId)
+                .orElseThrow(() -> new BusinessException(CODE_INVALID, "关系不存在"));
+        if (!relationship.getUserAId().equals(userId) && !relationship.getUserBId().equals(userId)) {
+            throw new BusinessException(CODE_FORBIDDEN, "无权解除该关系");
+        }
+        Long requesterId = relationship.getUserAId();
+        Long targetId = relationship.getUserBId();
+        var familyOpt = familyRepository.findFirstByCreatorIdOrderByIdAsc(requesterId);
+        if (familyOpt.isPresent()) {
+            Long familyId = familyOpt.get().getId();
+            familyMemberRepository.findByFamilyIdAndUserId(familyId, targetId)
+                    .filter(m -> "CONNECTION_REQUEST".equals(m.getRelationSource()))
+                    .ifPresent(familyMemberRepository::delete);
+            lovedOneRepository.findFirstByFamilyIdAndUserId(familyId, targetId)
+                    .ifPresent(lovedOneRepository::delete);
+        }
+        relationship.setStatus("REMOVED");
+        relationshipRepository.save(relationship);
+        requestRepository.findFirstByRequesterIdAndTargetIdOrderByIdDesc(requesterId, targetId)
+                .ifPresent(request -> {
+                    request.setStatus("REMOVED");
+                    requestRepository.save(request);
+                });
+        // 若被解除方失去唯一档案卡，则在本人默认家族重建"自己"的档案卡
+        if (lovedOneRepository.findByUserId(targetId).isEmpty()) {
+            userRepository.findById(targetId).ifPresent(target -> {
+                var ownFamily = familyService.getOrCreateDefaultFamily(targetId, target.getName());
+                if (ownFamily != null) {
+                    memberProfileService.ensureMemberProfile(ownFamily.getId(), targetId);
+                }
+            });
+        }
+        auditService.log("USER", userId, "RELATIONSHIP_REMOVED", "relationship:" + relationshipId,
+                Map.of("otherUserId", targetId.equals(userId) ? requesterId : targetId));
     }
 
     @Transactional

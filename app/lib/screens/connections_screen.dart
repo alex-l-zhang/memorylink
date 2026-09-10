@@ -13,7 +13,7 @@ class ConnectionsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('建立联系'),
@@ -21,6 +21,7 @@ class ConnectionsScreen extends StatelessWidget {
             Tab(text: '找人发起'),
             Tab(text: '收到的请求'),
             Tab(text: '我发起的'),
+            Tab(text: '已建立'),
           ]),
         ),
         body: TabBarView(
@@ -28,6 +29,7 @@ class ConnectionsScreen extends StatelessWidget {
             _SearchTab(api: api, token: token),
             _IncomingTab(api: api, token: token),
             _OutgoingTab(api: api, token: token),
+            _RelationshipsTab(api: api, token: token),
           ],
         ),
       ),
@@ -460,6 +462,127 @@ class _OutgoingTabState extends State<_OutgoingTab> {
                 '我是你的${_relationLabel(item.relation)}'
                 '${accepted && item.inverseRelation != null ? ' · 对方是我的${_relationLabel(item.inverseRelation)}' : ''}'
                 '\n发起时间：${_time(item.createdAt)}',
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _RelationshipsTab extends StatefulWidget {
+  final ApiClient api;
+  final String token;
+
+  const _RelationshipsTab({required this.api, required this.token});
+
+  @override
+  State<_RelationshipsTab> createState() => _RelationshipsTabState();
+}
+
+class _RelationshipsTabState extends State<_RelationshipsTab> {
+  List<RelationshipItem> _items = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  Future<void> _reload() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final items = await widget.api.relationships(widget.token);
+      if (!mounted) return;
+      setState(() => _items = items);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = '加载失败，请稍后重试');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _remove(RelationshipItem item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('解除关系？'),
+        content: Text('解除后，你与「${item.otherName}」将不再互相出现在对方的记忆档案中。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(dialogContext).colorScheme.error),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('解除关系'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await widget.api.removeRelationship(widget.token, item.id);
+      await _reload();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('关系已解除')));
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('操作失败，请稍后重试')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_error!),
+            const SizedBox(height: 12),
+            FilledButton(onPressed: _reload, child: const Text('重试')),
+          ],
+        ),
+      );
+    }
+    if (_items.isEmpty) {
+      return const Center(child: Text('还没有已建立的关系'));
+    }
+    return RefreshIndicator(
+      onRefresh: _reload,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(12),
+        itemCount: _items.length,
+        itemBuilder: (context, index) {
+          final item = _items[index];
+          return Card(
+            child: ListTile(
+              leading: const Icon(Icons.people_alt_outlined),
+              title: Text(item.otherName),
+              subtitle: Text('对方是我的${_relationLabel(item.relationFromMe)}'
+                  '${item.relationFromOther != null ? ' · 我是对方的${_relationLabel(item.relationFromOther)}' : ''}'),
+              trailing: TextButton(
+                onPressed: () => _remove(item),
+                style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
+                child: const Text('解除关系'),
               ),
             ),
           );

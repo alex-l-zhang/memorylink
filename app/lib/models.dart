@@ -321,6 +321,30 @@ class ConnectionHistoryItem {
       );
 }
 
+class RelationshipItem {
+  final int id;
+  final int otherUserId;
+  final String otherName;
+  final String relationFromMe;
+  final String? relationFromOther;
+
+  RelationshipItem({
+    required this.id,
+    required this.otherUserId,
+    required this.otherName,
+    required this.relationFromMe,
+    this.relationFromOther,
+  });
+
+  factory RelationshipItem.fromJson(Map<String, dynamic> json) => RelationshipItem(
+        id: (json['id'] as num).toInt(),
+        otherUserId: (json['otherUserId'] as num).toInt(),
+        otherName: json['otherName'] as String? ?? '',
+        relationFromMe: json['relationFromMe'] as String? ?? '',
+        relationFromOther: json['relationFromOther'] as String?,
+      );
+}
+
 class ChatResult {
   final int conversationId;
   final String answer;

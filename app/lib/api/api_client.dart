@@ -201,6 +201,21 @@ class ApiClient {
         .toList();
   }
 
+  Future<List<RelationshipItem>> relationships(String token) async {
+    final data = await _get('/api/v1/connections/relationships', token: token);
+    return (data as List)
+        .map((e) => RelationshipItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> removeRelationship(String token, int relationshipId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/api/v1/connections/relationships/$relationshipId'),
+      headers: _headers(token),
+    );
+    _decode(response);
+  }
+
   Future<void> acceptConnection(String token, int requestId, {String? inverseRelation}) async {
     await _post(
       '/api/v1/connections/requests/$requestId/accept',

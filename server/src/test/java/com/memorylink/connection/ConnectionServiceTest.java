@@ -96,19 +96,16 @@ class ConnectionServiceTest {
         when(requestRepository.findByIdAndTargetIdAndStatus(10L, 2L, "PENDING"))
                 .thenReturn(Optional.of(request));
         when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "李四", null, null)));
-        User acceptor = user(2L, "张三", "1990-01-01", "上海");
-        acceptor.setGender("FEMALE");
-        when(userRepository.findById(2L)).thenReturn(Optional.of(acceptor));
         Family family = new Family();
         family.setId(9L);
         when(familyService.getOrCreateDefaultFamily(1L, "李四")).thenReturn(family);
         when(familyMemberRepository.existsByFamilyIdAndUserId(9L, 2L)).thenReturn(false);
 
-        service.accept(2L, 10L, null);
+        service.accept(2L, 10L, "MOTHER");
 
         ArgumentCaptor<FamilyRelationship> captor = ArgumentCaptor.forClass(FamilyRelationship.class);
         verify(relationshipRepository).save(captor.capture());
-        // 发起人自称是对方的子女（CHILD→SON），接收方为女性 → 反向自动为母亲
+        // 由接收方自己选择的关系（母亲）为准
         assertThat(captor.getValue().getRelationAToB()).isEqualTo("MOTHER");
         verify(familyMemberRepository).save(any());
         assertThat(request.getStatus()).isEqualTo("ACCEPTED");
@@ -136,7 +133,7 @@ class ConnectionServiceTest {
     }
 
     @Test
-    void acceptAmbiguousRelationWithoutGenderRejected() {
+    void acceptWithoutRecipientRelationRejected() {
         ConnectionRequest request = new ConnectionRequest();
         request.setId(12L);
         request.setRequesterId(1L);
@@ -145,10 +142,9 @@ class ConnectionServiceTest {
         when(requestRepository.findByIdAndTargetIdAndStatus(12L, 2L, "PENDING"))
                 .thenReturn(Optional.of(request));
         when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "何女", null, null)));
-        when(userRepository.findById(2L)).thenReturn(Optional.of(user(2L, "某人", null, null)));
 
         assertThatThrownBy(() -> service.accept(2L, 12L, null))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("需要确认");
+                .hasMessageContaining("请选择你与对方的关系");
     }
 }

@@ -168,7 +168,7 @@ class ApiClient {
     String token, {
     required List<int> targetIds,
     required String relation,
-    required String inverseRelation,
+    String? inverseRelation,
   }) async {
     await _post(
         '/api/v1/connections/requests',

@@ -73,8 +73,9 @@ public class ConnectionService {
     @Transactional
     public int send(Long userId, List<Long> targetIds, String relation, String inverseRelation) {
         String rel = relation == null ? "" : relation.trim().toUpperCase();
-        String inverse = inverseRelation == null ? "" : inverseRelation.trim().toUpperCase();
-        if (!RelationCatalog.isValid(rel) || !RelationCatalog.isValid(inverse)) {
+        String inverse = inverseRelation == null || inverseRelation.isBlank()
+                ? null : inverseRelation.trim().toUpperCase();
+        if (!RelationCatalog.isValid(rel) || (inverse != null && !RelationCatalog.isValid(inverse))) {
             throw new BusinessException(CODE_INVALID, "请选择有效的亲属关系");
         }
         User me = userRepository.findById(userId)
@@ -143,16 +144,13 @@ public class ConnectionService {
                 .orElseThrow(() -> new BusinessException(CODE_INVALID, "请求不存在或已处理"));
         User requester = userRepository.findById(request.getRequesterId())
                 .orElseThrow(() -> new BusinessException(CODE_USER_NOT_FOUND, "发起人不存在"));
-        User acceptor = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(CODE_USER_NOT_FOUND, "用户不存在"));
-        if (inverseOverride == null && acceptor.getGender() == null
-                && isGenderAmbiguous(request.getRelation())) {
-            throw new BusinessException(CODE_INVERSE_REQUIRED,
-                    "对方与你的关系需要确认：请先在我的资料填写性别，或在同意时选择你与对方的关系");
+        if (inverseOverride == null || inverseOverride.isBlank()) {
+            throw new BusinessException(CODE_INVERSE_REQUIRED, "请选择你与对方的关系后再同意");
         }
-        String finalInverse = resolveInverse(request.getRelation(),
-                inverseOverride != null ? inverseOverride : request.getInverseRelation(),
-                acceptor.getGender());
+        String finalInverse = inverseOverride.trim().toUpperCase();
+        if (!RelationCatalog.isValid(finalInverse)) {
+            throw new BusinessException(CODE_INVALID, "请选择有效的亲属关系");
+        }
         Family family = familyService.getOrCreateDefaultFamily(requester.getId(), requester.getName());
         if (!familyMemberRepository.existsByFamilyIdAndUserId(family.getId(), userId)) {
             FamilyMember member = new FamilyMember();
@@ -218,48 +216,6 @@ public class ConnectionService {
         }
     }
 
-    private String inverse(String relation) {
-        return switch (relation) {
-            case "PARENT" -> "CHILD";
-            case "CHILD" -> "PARENT";
-            case "GRANDPARENT" -> "GRANDCHILD";
-            case "GRANDCHILD" -> "GRANDPARENT";
-            default -> relation;
-        };
-    }
-
-    /**
-     * 反向关系解析：优先用户确认值；否则按接收方性别自动推断；再否则使用原值/兜底。
-     */
-    private String resolveInverse(String relation, String stored, String acceptorGender) {
-        String base = RelationCatalog.normalizeLegacy(stored);
-        String rel = RelationCatalog.normalizeLegacy(relation);
-        if (acceptorGender == null) {
-            return base;
-        }
-        boolean male = "MALE".equalsIgnoreCase(acceptorGender);
-        return switch (rel) {
-            case "SON", "DAUGHTER" -> male ? "FATHER" : "MOTHER";
-            case "FATHER", "MOTHER" -> male ? "SON" : "DAUGHTER";
-            case "GRANDSON", "GRANDDAUGHTER", "GRANDSON_DAUGHTER", "GRANDDAUGHTER_DAUGHTER" ->
-                    male
-                            ? (rel.contains("DAUGHTER_") ? "GRANDFATHER_MATERNAL" : "GRANDFATHER_PATERNAL")
-                            : (rel.contains("DAUGHTER_") ? "GRANDMOTHER_MATERNAL" : "GRANDMOTHER_PATERNAL");
-            case "GRANDFATHER_PATERNAL", "GRANDMOTHER_PATERNAL",
-                 "GRANDFATHER_MATERNAL", "GRANDMOTHER_MATERNAL" ->
-                    male ? "GRANDSON" : "GRANDDAUGHTER";
-            default -> base;
-        };
-    }
-
-    /** 需要性别才能确定的反向称谓（子女/父母/祖孙等）。 */
-    private boolean isGenderAmbiguous(String relation) {
-        String rel = RelationCatalog.normalizeLegacy(relation);
-        return Set.of("SON", "DAUGHTER", "FATHER", "MOTHER",
-                "GRANDSON", "GRANDDAUGHTER", "GRANDSON_DAUGHTER", "GRANDDAUGHTER_DAUGHTER",
-                "GRANDFATHER_PATERNAL", "GRANDMOTHER_PATERNAL",
-                "GRANDFATHER_MATERNAL", "GRANDMOTHER_MATERNAL").contains(rel);
-    }
 
     private ConnectionRequestResponse toResponse(ConnectionRequest request) {
         return new ConnectionRequestResponse(

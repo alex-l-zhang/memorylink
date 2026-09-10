@@ -11,7 +11,6 @@ public record SendConnectionRequest(
         @NotBlank(message = "请选择与联系人的关系")
         String relation,
 
-        @NotBlank(message = "请选择对方与你的关系")
         String inverseRelation
 ) {
 }

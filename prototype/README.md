@@ -73,6 +73,12 @@ python3 tools/scene_check.py /tmp/scene-check    # 黄框=窗灯，红框=门口
 python3 tools/prepare_scenes.py 原图.jpg public/scenes/xxx.jpg
 ```
 
+挑候选素材时先用 `tools/scene_grade.py` 客观打分（基准是当前首页图），再决定要不要接进入库流程：
+
+```bash
+python3 tools/scene_grade.py 候选图1.jpg 候选图2.png    # 输出"通过 / 注意 / 不合格"
+```
+
 **注意**：照片和窗灯必须放在同一个 `scene-world` 图层里一起做推镜，否则照片动了、灯没动，锚点会漂。
 
 ## 验证

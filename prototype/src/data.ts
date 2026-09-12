@@ -4,8 +4,15 @@
 export type TimeOfDay = 'dawn' | 'dusk' | 'night'
 export type Mode = 'living' | 'memorial'
 
-export type Skyline = 'lake' | 'sea' | 'forest' | 'mountain' | 'village' | 'city'
-export type HouseStyle = 'study' | 'white' | 'cabin' | 'stone' | 'courtyard' | 'loft'
+/**
+ * 照片场景（V2）：每个成套场景由一张真实照片 + 若干"可点亮的窗口"锚点组成。
+ * 锚点坐标是照片的百分比（x/y 为左上角，w/h 为尺寸），与 public/scenes 下 1600×900 的图一一对应，
+ * 因此照片按 16:9 铺满画面时不需要再做换算。照片裁切与锚点校准见 prototype/tools/。
+ */
+export type Spot = { x: number; y: number; w: number; h: number }
+
+/** 屋外的空气感图层：水面薄雾 / 林间光束 / 尘埃 / 城市灯火。 */
+export type Air = 'mist' | 'haze' | 'dust' | 'city'
 
 /** 成套场景：位置与房型绑定，不做自由组合（设计决策 4.3）。 */
 export type Scene = {
@@ -14,14 +21,20 @@ export type Scene = {
   place: string
   kind: string
   note: string
-  skyline: Skyline
-  house: HouseStyle
-  water: boolean
-  sky: [string, string]
-  far: string
-  mid: string
-  ground: string
+  /** 屋外：真实照片（1600×900）。 */
+  photo: string
+  /** 屋里：真实室内照片（1600×900）。 */
+  interior: string
+  /** 窗户锚点：新成员加入就多亮一扇（设计 4.4）。 */
+  lights: Spot[]
+  /** 门口那盏灯的锚点，切到"之后"时亮起。 */
+  lamp: Spot
+  /** 长明灯的落点（每位故人一盏）。 */
+  candle: { x: number; y: number }
+  air: Air
   accent: string
+  /** 照片来源，用于原型署名。 */
+  credit: string
 }
 
 export const SCENES: Scene[] = [
@@ -31,14 +44,19 @@ export const SCENES: Scene[] = [
     place: '湖畔',
     kind: '书舍',
     note: '清晨的水面很静，适合慢慢讲从前的事',
-    skyline: 'lake',
-    house: 'study',
-    water: true,
-    sky: ['#cfe6f2', '#f6e7cb'],
-    far: '#8fb2b8',
-    mid: '#5f8a86',
-    ground: '#6f8f5f',
-    accent: '#c8873f',
+    photo: '/scenes/lake-study.jpg',
+    interior: '/scenes/in-lake.jpg',
+    lights: [
+      { x: 28.4, y: 24.6, w: 3.4, h: 4.6 },
+      { x: 28.2, y: 32, w: 3.6, h: 4.4 },
+      { x: 25, y: 40.6, w: 3.8, h: 4.8 },
+      { x: 31.2, y: 40.6, w: 3.8, h: 4.8 },
+    ],
+    lamp: { x: 32.2, y: 47.4, w: 4.2, h: 4.6 },
+    candle: { x: 44, y: 87 },
+    air: 'mist',
+    accent: '#e2a24d',
+    credit: 'Unsplash',
   },
   {
     id: 'sea-white',
@@ -46,14 +64,19 @@ export const SCENES: Scene[] = [
     place: '海边',
     kind: '白屋',
     note: '窗子朝海，风一吹，一屋子都是亮的',
-    skyline: 'sea',
-    house: 'white',
-    water: true,
-    sky: ['#bfe0f5', '#ffeccd'],
-    far: '#9dc6d8',
-    mid: '#6fa8bd',
-    ground: '#e6d9bd',
-    accent: '#3f7fa8',
+    photo: '/scenes/sea-white.jpg',
+    interior: '/scenes/in-sea.jpg',
+    lights: [
+      { x: 42, y: 46.5, w: 2.6, h: 3.8 },
+      { x: 60.5, y: 47, w: 2.4, h: 3.4 },
+      { x: 85, y: 45, w: 2.6, h: 4 },
+      { x: 92, y: 46.5, w: 2.6, h: 4 },
+    ],
+    lamp: { x: 44, y: 50.5, w: 3, h: 3 },
+    candle: { x: 44, y: 87 },
+    air: 'mist',
+    accent: '#7fa9c4',
+    credit: 'Unsplash',
   },
   {
     id: 'forest-cabin',
@@ -61,14 +84,19 @@ export const SCENES: Scene[] = [
     place: '森林',
     kind: '木屋',
     note: '木头是自己选的，火塘永远留着一个位置',
-    skyline: 'forest',
-    house: 'cabin',
-    water: false,
-    sky: ['#d7ead9', '#f6f0d8'],
-    far: '#7fa87c',
-    mid: '#4d7a58',
-    ground: '#3f6248',
-    accent: '#b5713c',
+    photo: '/scenes/forest-cabin.jpg',
+    interior: '/scenes/in-forest.jpg',
+    lights: [
+      { x: 15.2, y: 58.5, w: 4.8, h: 10.5 },
+      { x: 21.4, y: 59, w: 4.2, h: 9.5 },
+      { x: 32.4, y: 57.5, w: 4.8, h: 11.5 },
+      { x: 48.2, y: 58.5, w: 5.2, h: 9 },
+    ],
+    lamp: { x: 56.5, y: 68.5, w: 4.4, h: 4.4 },
+    candle: { x: 44, y: 87 },
+    air: 'haze',
+    accent: '#8fae7a',
+    credit: 'Unsplash',
   },
   {
     id: 'mountain-stone',
@@ -76,14 +104,19 @@ export const SCENES: Scene[] = [
     place: '高山',
     kind: '石屋',
     note: '山上的日子慢，一年只热闹那几回',
-    skyline: 'mountain',
-    house: 'stone',
-    water: false,
-    sky: ['#c9d8ee', '#f2e6d6'],
-    far: '#8f9fbe',
-    mid: '#68789b',
-    ground: '#6b6f7a',
-    accent: '#a8763f',
+    photo: '/scenes/mountain-stone.jpg',
+    interior: '/scenes/in-mountain.jpg',
+    lights: [
+      { x: 75.4, y: 25, w: 4, h: 5.6 },
+      { x: 74.6, y: 44.5, w: 4.6, h: 11.5 },
+      { x: 89.4, y: 28, w: 3.6, h: 6.5 },
+      { x: 71.6, y: 79.5, w: 3.2, h: 4.4 },
+    ],
+    lamp: { x: 76.6, y: 39.5, w: 4.4, h: 4.4 },
+    candle: { x: 44, y: 87 },
+    air: 'dust',
+    accent: '#c8955a',
+    credit: 'Unsplash',
   },
   {
     id: 'village-yard',
@@ -91,14 +124,19 @@ export const SCENES: Scene[] = [
     place: '乡村',
     kind: '院落',
     note: '院里那棵树，是爷爷那一辈种下的',
-    skyline: 'village',
-    house: 'courtyard',
-    water: false,
-    sky: ['#f2e2c4', '#fbf3e2'],
-    far: '#c2b08c',
-    mid: '#9c8a63',
-    ground: '#a9a06a',
-    accent: '#a8442f',
+    photo: '/scenes/village-yard.jpg',
+    interior: '/scenes/in-village.jpg',
+    lights: [
+      { x: 57.5, y: 21.5, w: 22, h: 6 },
+      { x: 56.5, y: 30, w: 11.5, h: 18 },
+      { x: 69.5, y: 30, w: 11.5, h: 18 },
+      { x: 10.5, y: 28, w: 6.5, h: 16 },
+    ],
+    lamp: { x: 12, y: 50, w: 4, h: 4 },
+    candle: { x: 44, y: 87 },
+    air: 'dust',
+    accent: '#b8653f',
+    credit: 'Unsplash',
   },
   {
     id: 'city-loft',
@@ -106,18 +144,35 @@ export const SCENES: Scene[] = [
     place: '闹市',
     kind: '阁楼',
     note: '楼下是整条街的声音，楼上只有一盏灯',
-    skyline: 'city',
-    house: 'loft',
-    water: false,
-    sky: ['#d9d3e8', '#f7dfd0'],
-    far: '#a79cb8',
-    mid: '#7d7391',
-    ground: '#8b8496',
+    photo: '/scenes/city-loft.jpg',
+    interior: '/scenes/in-city.jpg',
+    lights: [
+      { x: 25.5, y: 77.5, w: 3.6, h: 2.8 },
+      { x: 37.5, y: 83.5, w: 3.6, h: 2.8 },
+      { x: 54.5, y: 79.5, w: 3.6, h: 2.8 },
+      { x: 67.5, y: 73.5, w: 3.6, h: 2.8 },
+    ],
+    lamp: { x: 62, y: 87.5, w: 4.2, h: 3.4 },
+    candle: { x: 44, y: 87 },
+    air: 'city',
     accent: '#d98b3f',
+    credit: 'Unsplash',
   },
 ]
 
-export type Photo = { id: string; year: string; caption: string }
+/** 家人的照片：原型用真实图片，替换成用户上传的照片即可。 */
+export const ALBUM = [
+  '/album/01.jpg',
+  '/album/02.jpg',
+  '/album/03.jpg',
+  '/album/04.jpg',
+  '/album/05.jpg',
+  '/album/06.jpg',
+  '/album/07.jpg',
+  '/album/08.jpg',
+]
+
+export type Photo = { id: string; year: string; caption: string; img: string }
 export type Story = { id: string; title: string; by: string; text: string; askedBy?: string }
 export type Letter = { id: string; to: string; openAt: string; text: string; declined: boolean }
 export type Member = { id: string; name: string; relation: string; room: string; private: boolean }
@@ -150,9 +205,9 @@ export const initialState: State = {
   time: 'dawn',
   mode: 'living',
   photos: [
-    { id: 'p1', year: '1953', caption: '老屋门前，父亲抱着我' },
-    { id: 'p2', year: '1987', caption: '院子里那棵石榴树' },
-    { id: 'p3', year: '2001', caption: '第一次全家福' },
+    { id: 'p1', year: '1953', caption: '老屋门前，父亲抱着我', img: '/album/01.jpg' },
+    { id: 'p2', year: '1987', caption: '院子里那棵石榴树', img: '/album/03.jpg' },
+    { id: 'p3', year: '2001', caption: '第一次全家福', img: '/album/02.jpg' },
   ],
   stories: [
     {

@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import {
+  ALBUM,
   HOUSEHOLD,
   NAV,
   OWNER,
@@ -75,7 +76,7 @@ export default function App() {
       ...prev,
       photos: [
         ...prev.photos,
-        { id: `p${Date.now()}`, year: years[i % years.length], caption: captions[i % captions.length] },
+        { id: `p${Date.now()}`, year: years[i % years.length], caption: captions[i % captions.length], img: ALBUM[i % ALBUM.length] },
       ],
     }))
     toast('客厅的墙上，多了一张照片', '父亲那一辈的样子，又多留住一点。')
@@ -681,10 +682,9 @@ function Picker({ current, onPick, onClose }: { current: string; onPick: (id: st
               key={s.id}
               className={`pick ${current === s.id ? 'on' : ''}`}
               onClick={() => onPick(s.id)}
-              style={{ background: `linear-gradient(180deg, ${s.sky[0]}, ${s.sky[1]})` }}
             >
-              <span className="pick-house" style={{ background: s.mid }} />
-              <span className="pick-name">{s.name}</span>
+              <span className="pick-photo" style={{ backgroundImage: `url(${s.photo})` }} />
+              <span className="pick-title">{s.name}</span>
               <span className="pick-note">{s.note}</span>
             </button>
           ))}

@@ -25,6 +25,9 @@ NORM_WIDTH = 1600
 REF = {
     "local_detail": 13.0,   # 首页图 16.3（统一到 1600 宽后）
     "clip_low": 0.5,        # 首页图 0.03%
+    "dark_lum": 15.0,       # 最暗 20% 像素的平均亮度；首页图 25.1
+    "dark_detail": 8.0,     # 最暗 20% 像素里的纹理能量；首页图 10.1
+    "blue_ratio": 0.65,     # 偏蓝像素的 (B-G)/(B-R)；首页图 0.36（青蓝），越高越偏紫
     "clip_high": 0.5,       # 首页图 0.01%
     "sky_sat": 0.12,        # 首页图 0.16
     "mirror": 0.55,         # 越低越好（越高=水面越像镜子）；首页图 0.27
@@ -78,7 +81,18 @@ def grade(path: Path) -> dict:
         slum = 0.2126 * sa[..., 0] + 0.7152 * sa[..., 1] + 0.0722 * sa[..., 2]
     else:
         slum = lum
-    local_detail = (slum - box_blur(slum, 5)).std() * 255
+    sharp = slum - box_blur(slum, 5)
+    local_detail = sharp.std() * 255
+
+    # 暗部：整张图偏暗会让"死黑占比"虚高，所以另算"最暗 20% 区域还有多少亮度和纹理"。
+    dark = slum <= np.percentile(slum, 20)
+    dark_lum = slum[dark].mean() * 255
+    dark_detail = sharp[dark].std() * 255
+
+    # 冷色色相：自然的暮色阴影是青蓝（G 接近 B），紫蓝是模型自己造出来的颜色。
+    bg = b - g
+    blue = (b - r) >= np.percentile(b - r, 90)
+    blue_ratio = bg[blue].mean() / max(1e-6, (b - r)[blue].mean())
 
     return {
         "file": path.name,
@@ -92,6 +106,9 @@ def grade(path: Path) -> dict:
         "p1": np.percentile(lum, 1) * 255,
         "p99": np.percentile(lum, 99) * 255,
         "local_detail": local_detail,
+        "dark_lum": dark_lum,
+        "dark_detail": dark_detail,
+        "blue_ratio": blue_ratio,
         "detail_scale": "1600 宽" if w != NORM_WIDTH else "原生",
         "sky_sat": sat[sky].mean(),
         "sky_blown": (lum[sky] > 0.90).mean() * 100,
@@ -129,6 +146,22 @@ def verdicts(m: dict) -> list[tuple[str, str, str]]:
         out.append(("暗部", bad, f"{m['clip_low']:.2f}% 像素压成死黑（首页图 0.03%）"))
     else:
         out.append(("暗部", ok, f"死黑 {m['clip_low']:.2f}%"))
+
+    if m["dark_lum"] < REF["dark_lum"]:
+        out.append(("暗部层次", bad,
+                    f"最暗 20% 区域平均亮度只有 {m['dark_lum']:.1f}/255（首页图 25.1），"
+                    f"纹理能量 {m['dark_detail']:.1f}（首页图 10.1）→ 暗部是剪影、没有信息"))
+    else:
+        out.append(("暗部层次", ok,
+                    f"最暗 20% 区域平均亮度 {m['dark_lum']:.1f}/255，纹理能量 {m['dark_detail']:.1f}"))
+
+    br_ratio = m["blue_ratio"]
+    if br_ratio > REF["blue_ratio"]:
+        out.append(("冷色色相", warn,
+                    f"(B-G)/(B-R)={br_ratio:.2f}（首页图 0.36），冷色偏紫蓝；"
+                    f"自然的暮色阴影应是青蓝（G 接近 B）"))
+    else:
+        out.append(("冷色色相", ok, f"(B-G)/(B-R)={br_ratio:.2f}（首页图 0.36），青蓝"))
 
     if m["p99"] > 240:
         out.append(("高光", warn, f"亮度 99 分位 {m['p99']:.0f}/255，高光接近溢出的区域偏多"))

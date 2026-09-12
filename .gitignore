@@ -27,3 +27,4 @@ app/.flutter-plugins-dependencies
 # 测试产物
 coverage/
 *.html
+!prototype/index.html

@@ -86,7 +86,9 @@ NODE_PATH=<装了 playwright 的目录> node tools/visual_smoke.cjs http://127.0
 
 ## 素材来源（重要）
 
-【事实】`public/scenes/` 与 `public/album/` 里的照片是**演示用素材**（Unsplash 精选，经 picsum.photos 取用），只用于设计评审，**不是可上线素材**。正式产品需要：
+【事实】`public/scenes/` 与 `public/album/` 里的照片**不是同一来源**，其中 8 张存在真实的知识产权风险。**逐张来源、风险等级与处理建议见 [`素材来源与授权.md`](./素材来源与授权.md)（务必先读）。**
+
+剩余 12 张来自 picsum.photos（站内自述图片均取自 Unsplash），只用于设计评审，**不是可上线素材**。正式产品需要：
 
 1. 自有拍摄或已授权的成套场景照片（按设计规划为 8 个场景）；
 2. 每个场景补三张时段照片或确认单张 + 调色方案；

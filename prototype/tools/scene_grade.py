@@ -4,6 +4,7 @@
 用来回答一个具体问题：一张候选图"看起来差"，到底差在哪、差多少。
 它不判断美丑，只量能被量化的部分（影调、质感、冷暖、镜面度、天空是否发白）。
 构图类指标（房子占比、窗户是否清晰、门在哪）仍需人工或 scene_check.py 目视确认。
+阈值是按"屋外场景照片"标定的，拿它量室内的 `in-*.jpg` 会大面积报不合格，属正常。
 
 用法：
     python3 prototype/tools/scene_grade.py 图1.jpg [图2.png ...]
@@ -18,8 +19,11 @@ import numpy as np
 from PIL import Image
 
 # 阈值取自"当前首页图"（lake-study.jpg，1600×900）的实测值，向下留一档余量。
+# 注意：局部细节的能量与分辨率相关，两张不同尺寸的图不能直接比——脚本会把所有图
+# 统一缩到 1600 宽再算这一项（其余指标与分辨率无关，按原图算）。
+NORM_WIDTH = 1600
 REF = {
-    "local_detail": 13.0,   # 首页图 16.3
+    "local_detail": 13.0,   # 首页图 16.3（统一到 1600 宽后）
     "clip_low": 0.5,        # 首页图 0.03%
     "clip_high": 0.5,       # 首页图 0.01%
     "sky_sat": 0.12,        # 首页图 0.16
@@ -67,6 +71,15 @@ def grade(path: Path) -> dict:
     sky = slice(0, h // 7)
     warm = (r - b > 0.06) & (lum > 0.35)
 
+    # 局部细节：统一缩到 1600 宽再量，避免"大图看起来细节多"的假象。
+    if w != NORM_WIDTH:
+        small = im.resize((NORM_WIDTH, max(1, round(h * NORM_WIDTH / w))), Image.LANCZOS)
+        sa = np.asarray(small).astype(np.float32) / 255.0
+        slum = 0.2126 * sa[..., 0] + 0.7152 * sa[..., 1] + 0.0722 * sa[..., 2]
+    else:
+        slum = lum
+    local_detail = (slum - box_blur(slum, 5)).std() * 255
+
     return {
         "file": path.name,
         "size": f"{w}×{h}",
@@ -78,7 +91,8 @@ def grade(path: Path) -> dict:
         "clip_high": (lum > 0.98).mean() * 100,
         "p1": np.percentile(lum, 1) * 255,
         "p99": np.percentile(lum, 99) * 255,
-        "local_detail": (lum - box_blur(lum, 5)).std() * 255,
+        "local_detail": local_detail,
+        "detail_scale": "1600 宽" if w != NORM_WIDTH else "原生",
         "sky_sat": sat[sky].mean(),
         "sky_blown": (lum[sky] > 0.90).mean() * 100,
         "warm_frac": warm.mean() * 100,
@@ -107,9 +121,9 @@ def verdicts(m: dict) -> list[tuple[str, str, str]]:
     d = m["local_detail"]
     if d < REF["local_detail"]:
         out.append(("质感层次", bad if d < REF["local_detail"] * 0.85 else warn,
-                    f"局部细节 {d:.1f}（首页图 16.3），偏低 → 画面发糊/塑料感"))
+                    f"局部细节 {d:.1f}（首页图 16.3，均已统一到 1600 宽），偏低 → 画面发糊/塑料感"))
     else:
-        out.append(("质感层次", ok, f"局部细节 {d:.1f}（首页图 16.3）"))
+        out.append(("质感层次", ok, f"局部细节 {d:.1f}（首页图 16.3，均已统一到 1600 宽）"))
 
     if m["clip_low"] > REF["clip_low"]:
         out.append(("暗部", bad, f"{m['clip_low']:.2f}% 像素压成死黑（首页图 0.03%）"))
